@@ -545,19 +545,42 @@
     .facts-card {
       max-width: 520px;
       max-height: 90vh;
+      max-height: 90dvh;
       display: flex;
       flex-direction: column;
+      overflow: hidden !important;
+      touch-action: pan-y !important;
     }
     .facts-scroll-area {
-      overflow-y: auto;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: scroll !important;
+      overflow-x: hidden !important;
       text-align: left;
       display: flex;
       flex-direction: column;
       gap: 11px;
-      padding-right: 4px;
-      margin: 12px 0 16px;
+      padding-right: 6px;
+      margin: 10px 0 14px;
       max-height: 56vh;
-      -webkit-overflow-scrolling: touch;
+      max-height: 56dvh;
+      -webkit-overflow-scrolling: touch !important;
+      touch-action: pan-y !important;
+      overscroll-behavior-y: contain !important;
+      user-select: text;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(56, 189, 248, 0.4) rgba(15, 23, 42, 0.6);
+    }
+    .facts-scroll-area::-webkit-scrollbar {
+      width: 6px;
+    }
+    .facts-scroll-area::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 4px;
+    }
+    .facts-scroll-area::-webkit-scrollbar-thumb {
+      background: rgba(56, 189, 248, 0.45);
+      border-radius: 4px;
     }
     .fact-item-card {
       background: rgba(15, 23, 42, 0.75);
@@ -1067,10 +1090,21 @@
 
       pauseMusic() {
         this.stopBGM();
+        if (this.ctx && this.ctx.state === 'running') {
+          this.ctx.suspend().catch(() => {});
+        }
+        if (this.customAudio) {
+          this.customAudio.pause();
+        }
       }
 
       resumeMusic() {
-        if (!this.isMuted) {
+        if (this.isMuted) return;
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().then(() => {
+            this.startBGM();
+          }).catch(() => {});
+        } else {
           this.startBGM();
         }
       }
@@ -2871,6 +2905,11 @@
        11. INPUT LISTENERS (TOUCH & MOUSE SUPPORT)
        ========================================================================== */
     function onPointerDown(e) {
+      if (gameState !== 'PLAYING') return;
+      const target = e.target;
+      if (target && target.closest('.overlay-modal:not(.hidden), button, input, .facts-scroll-area')) {
+        return;
+      }
       sound.init();
       isInteracting = true;
       currentSwipePoints = [];
@@ -2879,7 +2918,7 @@
     }
 
     function onPointerMove(e) {
-      if (!isInteracting) return;
+      if (!isInteracting || gameState !== 'PLAYING') return;
       const pt = getCanvasPoint(e);
       recordSwipePoint(pt.x, pt.y);
     }
@@ -2896,18 +2935,47 @@
       return { x: e.clientX, y: e.clientY };
     }
 
-    // Touch events
-    window.addEventListener('touchstart', onPointerDown, { passive: false });
-    window.addEventListener('touchmove', e => {
-      e.preventDefault();
-      onPointerMove(e);
+    // Touch events (Ensures Android facts list and modal scrollbars work natively)
+    window.addEventListener('touchstart', (e) => {
+      const target = e.target;
+      if (target && target.closest('.overlay-modal:not(.hidden), .facts-scroll-area, .modal-card, button, input')) {
+        return;
+      }
+      if (gameState === 'PLAYING') {
+        onPointerDown(e);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      const target = e.target;
+      // CRITICAL FOR MOBILE: If touching inside the scrollable facts area or any modal, NEVER preventDefault!
+      if (target && target.closest('.overlay-modal:not(.hidden), .facts-scroll-area, .modal-card, button, input')) {
+        return;
+      }
+      if (gameState === 'PLAYING' && isInteracting) {
+        if (e.cancelable) e.preventDefault();
+        onPointerMove(e);
+      }
     }, { passive: false });
-    window.addEventListener('touchend', onPointerUp);
-    window.addEventListener('touchcancel', onPointerUp);
+
+    window.addEventListener('touchend', onPointerUp, { passive: true });
+    window.addEventListener('touchcancel', onPointerUp, { passive: true });
 
     // Mouse fallback
-    window.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mousedown', (e) => {
+      const target = e.target;
+      if (target && target.closest('.overlay-modal:not(.hidden), button, input, .facts-scroll-area')) {
+        return;
+      }
+      if (gameState === 'PLAYING') {
+        onPointerDown(e);
+      }
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (gameState === 'PLAYING' && isInteracting) {
+        onPointerMove(e);
+      }
+    });
     window.addEventListener('mouseup', onPointerUp);
 
     /* ==========================================================================
@@ -3309,24 +3377,45 @@
       resumeBtn.addEventListener('click', resumeGame);
     }
 
-    // Auto-pause when player leaves tab, minimizes browser, or backgrounds app
+    // Dedicated touch isolation for Android smooth scrolling on the facts guide
+    const factsScrollAreaEl = document.querySelector('.facts-scroll-area');
+    if (factsScrollAreaEl) {
+      factsScrollAreaEl.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+      }, { passive: true });
+      factsScrollAreaEl.addEventListener('touchmove', (e) => {
+        e.stopPropagation();
+      }, { passive: true });
+    }
+
+    // Immediately stop background music and pause game when player leaves tab, switches to another app, or closes browser
+    function handleAppLeave() {
+      if (gameState === 'PLAYING') {
+        pauseGame();
+      }
+      // Unconditionally stop/suspend audio immediately so music never keeps playing in background
+      sound.pauseMusic();
+    }
+
+    function handleAppResume() {
+      // If player returns to the app and game is not paused and not muted, resume music
+      if (gameState !== 'PAUSED' && !sound.isMuted) {
+        sound.resumeMusic();
+      }
+    }
+
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && gameState === 'PLAYING') {
-        pauseGame();
+      if (document.hidden) {
+        handleAppLeave();
+      } else {
+        handleAppResume();
       }
     });
 
-    window.addEventListener('blur', () => {
-      if (gameState === 'PLAYING') {
-        pauseGame();
-      }
-    });
-
-    window.addEventListener('pagehide', () => {
-      if (gameState === 'PLAYING') {
-        pauseGame();
-      }
-    });
+    window.addEventListener('pagehide', handleAppLeave);
+    window.addEventListener('blur', handleAppLeave);
+    window.addEventListener('focus', handleAppResume);
+    document.addEventListener('freeze', handleAppLeave);
 
     // Custom audio file input support
     if (customMusicFile) {
@@ -3356,12 +3445,19 @@
       });
     }
 
-    // Cache page assets into CacheStorage for instant offline availability
+    // Cache page assets into CacheStorage for instant offline availability even with zero Wi-Fi
     if ('caches' in window) {
-      caches.open('gramslash-v3').then(cache => {
-        cache.add(window.location.href).catch(() => {});
-        cache.add('/').catch(() => {});
-      }).catch(() => {});
+      window.addEventListener('load', () => {
+        caches.open('gramslash-v4').then(cache => {
+          cache.addAll([
+            '/',
+            '/index.html',
+            '/manifest.json',
+            window.location.href,
+            window.location.pathname
+          ]).catch(() => {});
+        }).catch(() => {});
+      });
     }
 
     // Start rendering loop
