@@ -1,0 +1,3373 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Gram Slash</title>
+  <meta name="description" content="Fruit-Ninja-style microbiology game slicing pathogens with disinfectant spray while preserving beneficial flora." />
+  <meta property="og:title" content="Gram Slash" />
+  <meta property="og:description" content="Fruit-Ninja-style microbiology game slicing pathogens with disinfectant spray while preserving beneficial flora." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#080c16" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="/manifest.json" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-overflow-scrolling: touch;
+      background-color: #070b14;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #f1f5f9;
+      touch-action: none;
+      position: fixed;
+      inset: 0;
+    }
+    #game-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+    }
+    /* UI Overlay */
+    #ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+    }
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .hud-box {
+      pointer-events: auto;
+      background: rgba(13, 22, 38, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 12px;
+      padding: 8px 14px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+    .score-title {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      font-weight: 700;
+    }
+    .score-value {
+      font-size: 26px;
+      font-weight: 900;
+      color: #38bdf8;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+    .high-score-text {
+      font-size: 11px;
+      color: #a855f7;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+    .weapon-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(45, 212, 191, 0.4);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #2dd4bf;
+      letter-spacing: 0.05em;
+    }
+    .weapon-badge .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #2dd4bf;
+      box-shadow: 0 0 8px #2dd4bf;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.6; }
+    }
+    .lives-and-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .petri-lives {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+    .petri-dish {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid #38bdf8;
+      background: radial-gradient(circle at 35% 35%, #22c55e, #15803d);
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+    }
+    .petri-dish::after {
+      content: '';
+      position: absolute;
+      inset: 2px;
+      border-radius: 50%;
+      border: 1px dashed rgba(255, 255, 255, 0.4);
+    }
+    .petri-dish.lost {
+      border-color: #ef4444;
+      background: radial-gradient(circle at 50% 50%, #7f1d1d, #450a0a);
+      box-shadow: 0 0 5px rgba(239, 68, 68, 0.4);
+      transform: scale(0.85);
+    }
+    .petri-dish.lost::before {
+      content: '✕';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ef4444;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .icon-btn {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: #f1f5f9;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 15px;
+      transition: all 0.2s;
+    }
+    .icon-btn:active {
+      transform: scale(0.92);
+      background: rgba(56, 189, 248, 0.2);
+    }
+    .icon-btn.muted {
+      color: #94a3b8;
+      border-color: rgba(239, 68, 68, 0.4);
+      background: rgba(239, 68, 68, 0.12);
+    }
+    /* Educational Fact Banner */
+    .fact-banner {
+      pointer-events: auto;
+      background: rgba(10, 18, 32, 0.9);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 12px;
+      padding: 8px 14px;
+      margin: 0 auto;
+      max-width: 600px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+      transition: opacity 0.3s, transform 0.3s;
+      opacity: 0.96;
+    }
+    .fact-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .fact-text-wrap {
+      flex: 1;
+      min-width: 0;
+    }
+    .fact-label {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #38bdf8;
+    }
+    .fact-body {
+      font-size: 12px;
+      color: #e2e8f0;
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    @media (max-width: 480px) {
+      .fact-body {
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        font-size: 11px;
+      }
+    }
+    /* Overlays (Start / Game Over / Help) */
+    .overlay-modal {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      background: rgba(4, 9, 20, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      pointer-events: auto;
+    }
+    .modal-card {
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(10, 16, 30, 0.98) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 20px;
+      max-width: 460px;
+      width: 100%;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 24px rgba(56, 189, 248, 0.15);
+      animation: modalPop 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      max-height: 92vh;
+      overflow-y: auto;
+    }
+    @keyframes modalPop {
+      0% { transform: scale(0.92); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .game-logo {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      margin-bottom: 2px;
+      background: linear-gradient(135deg, #38bdf8 0%, #c084fc 50%, #f43f5e 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 30px rgba(192, 132, 252, 0.3);
+    }
+    .game-subtitle {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+    .creator-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #7dd3fc;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      letter-spacing: 0.02em;
+    }
+    .creator-badge b {
+      color: #ffffff;
+      font-weight: 800;
+    }
+    .cta-rule-box {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      margin-bottom: 14px;
+      text-align: left;
+    }
+    .cta-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      transition: transform 0.2s;
+    }
+    .cta-card.bad {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.45);
+    }
+    .cta-card.good {
+      background: rgba(34, 197, 94, 0.12);
+      border-color: rgba(34, 197, 94, 0.45);
+    }
+    .cta-card.streak {
+      background: rgba(234, 179, 8, 0.12);
+      border-color: rgba(234, 179, 8, 0.45);
+    }
+    .cta-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+    }
+    .cta-headline {
+      font-size: 12.5px;
+      font-weight: 900;
+      letter-spacing: 0.01em;
+    }
+    .cta-card.bad .cta-headline { color: #f87171; }
+    .cta-card.good .cta-headline { color: #4ade80; }
+    .cta-card.streak .cta-headline { color: #facc15; }
+    .cta-desc {
+      font-size: 11px;
+      color: #cbd5e1;
+      margin-top: 2px;
+      line-height: 1.35;
+    }
+    .cta-specials {
+      display: flex;
+      justify-content: space-around;
+      gap: 6px;
+      padding: 7px 10px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 10px;
+      font-size: 10.5px;
+      color: #94a3b8;
+      margin-bottom: 16px;
+    }
+    .cta-specials span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .cta-specials b {
+      color: #f1f5f9;
+    }
+    .primary-btn {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
+      transition: all 0.2s;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .primary-btn:active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 10px rgba(2, 132, 199, 0.3);
+    }
+    .secondary-btn {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: #cbd5e1;
+      border-radius: 12px;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+      transition: all 0.2s;
+    }
+    .secondary-btn:active {
+      background: rgba(51, 65, 85, 0.9);
+    }
+    .death-reason {
+      font-size: 13px;
+      color: #f87171;
+      font-weight: 700;
+      margin: 4px 0 6px;
+    }
+    .performance-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      margin: 4px auto 8px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+    .gameover-stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .stat-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 14px;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .stat-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 2px;
+    }
+    .stat-val {
+      font-size: 26px;
+      font-weight: 900;
+      color: #f8fafc;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-val.high {
+      color: #38bdf8;
+    }
+    .stat-val.streak-val {
+      color: #4ade80;
+    }
+    .stat-val.combo-val {
+      color: #facc15;
+    }
+    .facts-nav-btn {
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      border-radius: 14px;
+      padding: 13px 20px;
+      font-size: 13.5px;
+      font-weight: 800;
+      cursor: pointer;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .facts-nav-btn:active {
+      transform: scale(0.98);
+      background: rgba(51, 65, 85, 0.95);
+      border-color: #38bdf8;
+    }
+    .music-pill-btn {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      border-radius: 20px;
+      padding: 7px 16px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      margin: 10px auto 2px;
+      transition: all 0.2s;
+    }
+    .music-pill-btn:active {
+      transform: scale(0.96);
+      background: rgba(51, 65, 85, 0.9);
+    }
+    .music-pill-btn.muted {
+      color: #94a3b8;
+      border-color: rgba(148, 163, 184, 0.3);
+      background: rgba(15, 23, 42, 0.7);
+    }
+    .pause-card {
+      max-width: 360px;
+      text-align: center;
+      padding: 26px 22px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .pause-icon-badge {
+      font-size: 42px;
+      line-height: 1;
+      margin-bottom: 6px;
+      filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.6));
+      animation: pulse-pause 2.2s infinite ease-in-out;
+    }
+    @keyframes pulse-pause {
+      0%, 100% { transform: scale(1); opacity: 0.95; }
+      50% { transform: scale(1.08); opacity: 0.8; }
+    }
+    .facts-card {
+      max-width: 520px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .facts-scroll-area {
+      overflow-y: auto;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      padding-right: 4px;
+      margin: 12px 0 16px;
+      max-height: 56vh;
+      -webkit-overflow-scrolling: touch;
+    }
+    .fact-item-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #cbd5e1;
+    }
+    .fact-item-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .fact-item-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #f1f5f9;
+      flex: 1;
+    }
+    .fact-item-badge {
+      font-size: 9.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 6px;
+      letter-spacing: 0.05em;
+      flex-shrink: 0;
+    }
+    .badge-gut {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.4);
+    }
+    .badge-antibiotic {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    .badge-hygiene {
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+    }
+    .badge-future {
+      background: rgba(192, 132, 252, 0.2);
+      color: #c084fc;
+      border: 1px solid rgba(192, 132, 252, 0.4);
+    }
+    .death-reason {
+      color: #f87171;
+      font-size: 13px;
+      font-weight: 700;
+      margin: 8px 0 14px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Game Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Heads Up Display UI -->
+  <div id="ui-layer">
+    <div class="hud-top">
+      <!-- Score & Weapon -->
+      <div class="hud-box">
+        <div class="score-title">Sterilized Pathogens</div>
+        <div id="score-display" class="score-value">0</div>
+        <div id="high-score-display" class="high-score-text">Best: 0</div>
+      </div>
+
+      <div class="weapon-badge">
+        <div class="dot"></div>
+        <span>70% IPA MIST BLADE</span>
+      </div>
+
+      <!-- Lives & Controls -->
+      <div class="lives-and-controls">
+        <div class="petri-lives" title="Agar Plate Flora Lives (5 Max)">
+          <div id="petri-0" class="petri-dish"></div>
+          <div id="petri-1" class="petri-dish"></div>
+          <div id="petri-2" class="petri-dish"></div>
+          <div id="petri-3" class="petri-dish"></div>
+          <div id="petri-4" class="petri-dish"></div>
+        </div>
+        <button id="music-btn" class="icon-btn" title="Toggle Music">🎵</button>
+        <button id="pause-btn" class="icon-btn" title="Pause Game">⏸️</button>
+        <input type="file" id="custom-music-file" accept="audio/*" style="display:none">
+      </div>
+    </div>
+
+    <!-- Live Microbiology Fact / Message Bar -->
+    <div id="fact-banner" class="fact-banner">
+      <div class="fact-icon">🔬</div>
+      <div class="fact-text-wrap">
+        <div id="fact-label" class="fact-label">Microbiology Field Guide</div>
+        <div id="fact-body" class="fact-body">🔴 Red = Bad Bacteria (Slice)! 🟢 Green = Good Flora (Save)! Missing red = -1 Heart!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start Screen Modal -->
+  <div id="start-modal" class="overlay-modal">
+    <div class="modal-card">
+      <div class="game-logo">GRAM SLASH</div>
+      <div class="creator-badge">🔬 Made By <b>Satyam Goel</b></div>
+      <div class="game-subtitle">Disinfection Action Challenge</div>
+
+      <div class="cta-rule-box">
+        <div class="cta-card bad">
+          <div class="cta-icon">🔴</div>
+          <div>
+            <div class="cta-headline">RED BACTERIA ➔ SLICE & STERILIZE!</div>
+            <div class="cta-desc">Pathogens (<i>S. aureus</i>, <i>E. coli</i>, <i>Salmonella</i>, <i>Candida</i>). <b>Missing one costs 1 heart!</b></div>
+          </div>
+        </div>
+
+        <div class="cta-card good">
+          <div class="cta-icon">🟢</div>
+          <div>
+            <div class="cta-headline">GREEN BACTERIA ➔ SAVE! DO NOT SLICE!</div>
+            <div class="cta-desc">Beneficial flora (<i>Lactobacillus</i>, Yeast, <i>Rhizobium</i>). Slicing loses 1 life! Spared flora pass safely.</div>
+          </div>
+        </div>
+
+        <div class="cta-card streak">
+          <div class="cta-icon">🧫</div>
+          <div>
+            <div class="cta-headline">5-HIT STREAK ➔ +1 LIFE RESTORED!</div>
+            <div class="cta-desc">Chain 5 clean pathogen hits without hitting good flora to regenerate 1 lost life (max 5)!</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cta-specials">
+        <span>⚡ <b>Phage:</b> Screen Lysis</span>
+        <span>⚠️ <b>MRSA:</b> 3 Hits</span>
+        <span>☣️ <b>Bomb:</b> Avoid!</span>
+      </div>
+
+      <button id="start-btn" class="primary-btn">
+        <span>🧴</span>
+        <span>START STERILIZATION NOW</span>
+      </button>
+
+      <button id="start-music-btn" class="music-pill-btn" title="Toggle Music">
+        <span>🎵</span>
+        <span>Music: Playing</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Game Over Modal -->
+  <div id="gameover-modal" class="overlay-modal hidden">
+    <div class="modal-card">
+      <div class="game-logo" style="font-size: 26px;">EXPERIMENT TERMINATED</div>
+      <div id="gameover-reason" class="death-reason">You nuked all your good flora!</div>
+      <div id="final-performance" class="performance-badge">
+        <span>⭐</span>
+        <span>Good Score</span>
+      </div>
+
+      <div class="gameover-stats-grid">
+        <!-- Row 1: Final Score and High Score side by side -->
+        <div class="stat-card">
+          <div class="stat-label">Final Score</div>
+          <div id="final-score" class="stat-val">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">High Score</div>
+          <div id="final-high-score" class="stat-val high">0</div>
+        </div>
+        <!-- Row 2: Best Streak and Max Combo side by side in new line -->
+        <div class="stat-card">
+          <div class="stat-label">Best Streak</div>
+          <div id="final-best-streak" class="stat-val streak-val">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Max Combo</div>
+          <div id="final-max-combo" class="stat-val combo-val">0x</div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button id="restart-btn" class="primary-btn">
+          <span>🔄</span>
+          <span>STERILIZE AGAIN</span>
+        </button>
+
+        <button id="gameover-facts-btn" class="facts-nav-btn">
+          <span>💡</span>
+          <span>FUN MICROBIAL FACTS & HEALTH GUIDE</span>
+        </button>
+
+        <button id="gameover-music-btn" class="music-pill-btn" title="Toggle Music">
+          <span>🎵</span>
+          <span>Music: Playing</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fun Microbial Facts & Health Guide Modal -->
+  <div id="facts-modal" class="overlay-modal hidden">
+    <div class="modal-card facts-card" style="position: relative;">
+      <button id="facts-music-btn" class="icon-btn" title="Toggle Music" style="position: absolute; top: 16px; right: 16px; z-index: 10;">🎵</button>
+      <div class="game-logo" style="font-size: 22px; padding-right: 44px;">🔬 MICROBIAL FACTS & HEALTH GUIDE</div>
+      <div class="creator-badge" style="margin: 4px auto 4px;">Curated by <b>Satyam Goel</b></div>
+      <div style="font-size: 11.5px; color: #38bdf8; margin: 0 auto 8px; font-weight: 700; background: rgba(56, 189, 248, 0.12); padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); display: inline-flex; align-items: center; gap: 6px;">
+        <span>🎹</span>
+        <span>The BG music was recorded by me on piano.</span>
+      </div>
+      <div class="game-subtitle">Vital Microbiology Facts for Good Flora & Everyday Immunity</div>
+
+      <div class="facts-scroll-area">
+        <!-- Fact 1 -->
+        <div class="fact-item-card">
+          <div class="fact-item-header">
+            <span style="font-size: 18px;">🥗</span>
+            <div class="fact-item-title">Eat Diverse Dietary Fiber to Cultivate Good Flora</div>
+            <span class="fact-item-badge badge-gut">Prebiotics</span>
+          </div>
+          <div>Human digestive enzymes cannot break down soluble prebiotic fibers (inulin, resistant starch, pectin). Your beneficial colon bacteria (<i>Bifidobacteria</i>, <i>Lactobacillus</i>, <i>Faecalibacterium</i>) ferment these fibers into <b>Short-Chain Fatty Acids (SCFAs)</b>, primarily <b>butyrate</b>. Butyrate powers 70% of colon epithelial cells, seals your gut barrier to stop "leaky gut," and signals the brain via the vagus nerve to calm systemic inflammation! Aim for <b>30+ diverse plant varieties</b> every week.</div>
+        </div>
+
+        <!-- Fact 2 -->
+        <div class="fact-item-card">
+          <div class="fact-item-header">
+            <span style="font-size: 18px;">💊</span>
+            <div class="fact-item-title">Always Complete Your Full Antibiotic Course</div>
+            <span class="fact-item-badge badge-antibiotic">Superbug Shield</span>
+          </div>
+          <div>When you feel better after just 2 or 3 days of antibiotics, the medication has only wiped out the weakest bacteria. The toughest, partially resistant mutant bacteria are still alive! If you halt your course early, these survivors multiply, exchange plasmid resistance genes, and evolve into incurable <b>MRSA and superbug strains</b>. Completing the full prescription guarantees no resistant survivors remain. Never use antibiotics for viral colds or influenza!</div>
+        </div>
+
+        <!-- Fact 3 -->
+        <div class="fact-item-card">
+          <div class="fact-item-header">
+            <span style="font-size: 18px;">🧼</span>
+            <div class="fact-item-title">Soap & Running Water vs. 70% Alcohol Sanitizer</div>
+            <span class="fact-item-badge badge-hygiene">Hygiene Rule</span>
+          </div>
+          <div>70% alcohol hand rub is exceptional at inactivating lipid-enveloped viruses (Influenza, SARS-CoV-2) and vegetative bacteria by denaturing proteins. However, tough bacterial endospores (such as <i>Clostridioides difficile</i>) and non-enveloped stomach viruses (like <i>Norovirus</i>) are <b>completely unharmed by alcohol</b>! Only mechanical handwashing with amphiphilic soap and running water physically lifts spores and flushes them down the drain.</div>
+        </div>
+
+        <!-- Fact 4 -->
+        <div class="fact-item-card">
+          <div class="fact-item-header">
+            <span style="font-size: 18px;">🥛</span>
+            <div class="fact-item-title">Live Fermented Foods vs. Vinegar Pickling</div>
+            <span class="fact-item-badge badge-gut">Probiotics</span>
+          </div>
+          <div>Authentic fermented foods (raw kefir, unpasteurized sauerkraut, traditional kimchi, tempeh, and miso) contain billions of living lactic acid bacteria (<i>Lactobacillus plantarum</i>, <i>L. acidophilus</i>). In contrast, standard shelf-stable supermarket pickles are pasteurized in heated vinegar, which kills all live cultures. Look for refrigerated jars marked <b>"unpasteurized"</b> or <b>"contains live active cultures"</b>.</div>
+        </div>
+
+        <!-- Fact 5 -->
+        <div class="fact-item-card">
+          <div class="fact-item-header">
+            <span style="font-size: 18px;">🌿</span>
+            <div class="fact-item-title">The Hygiene Hypothesis: Don't Over-Sterilize!</div>
+            <span class="fact-item-badge badge-gut">Immune Training</span>
+          </div>
+          <div>Excessive bleaching and sterilizing of normal home environments deprives developing immune systems of crucial training. Early childhood contact with benign soil microbes (<i>Mycobacterium vaccae</i>), household pets, and outdoor nature trains regulatory T-cells ($T_{reg}$), drastically lowering the incidence of asthma, severe allergies, and autoimmune disorders. Keep hands clean, but embrace outdoor nature!</div>
+        </div>
+
+        <!-- Fact 6 -->
+        <div class="fact-item-card">
+          <div class="fact-item-header">
+            <span style="font-size: 18px;">⚡</span>
+            <div class="fact-item-title">Bacteriophages: The Precision Superbug Hunters</div>
+            <span class="fact-item-badge badge-future">Phage Therapy</span>
+          </div>
+          <div>Bacteriophages (phages) are ancient specialized viruses that prey exclusively on bacteria. Unlike broad-spectrum antibiotics that destroy your entire microbiome, therapeutic phages can be targeted to eradicate a specific hospital pathogen (like multidrug-resistant <i>Pseudomonas</i> or <i>MRSA</i>) with zero toxicity to human cells or your friendly gut flora!</div>
+        </div>
+
+        <!-- Fact 7 -->
+        <div class="fact-item-card">
+          <div class="fact-item-header">
+            <span style="font-size: 18px;">🦷</span>
+            <div class="fact-item-title">Flossing Protects Your Heart & Arteries</div>
+            <span class="fact-item-badge badge-hygiene">Oral Systemic</span>
+          </div>
+          <div>Over 700 bacterial species inhabit your mouth. Harmful oral anaerobes like <i>Porphyromonas gingivalis</i> from bleeding gums can migrate directly into your bloodstream through micro-abrasions, sticking to arterial walls and accelerating atherosclerosis. Daily interdental flossing protects your heart just as much as cardio exercise!</div>
+        </div>
+
+        <!-- Fact 8 -->
+        <div class="fact-item-card">
+          <div class="fact-item-header">
+            <span style="font-size: 18px;">🌙</span>
+            <div class="fact-item-title">The Circadian Microbiome Fasting Window</div>
+            <span class="fact-item-badge badge-gut">Gut Lining</span>
+          </div>
+          <div>Your gut bacteria have their own circadian clock! When you maintain a 12 to 14-hour overnight fasting window (no late-night snacking), specialized mucosal bacteria like <i>Akkermansia muciniphila</i> stimulate intestinal cell renewal, rebuilding a fresh, thick protective mucus lining before breakfast.</div>
+        </div>
+      </div>
+
+      <button id="return-start-btn" class="primary-btn" style="margin-top: 4px;">
+        <span>🏠</span>
+        <span>RETURN TO START PAGE</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Game Paused Modal -->
+  <div id="pause-modal" class="overlay-modal hidden">
+    <div class="modal-card pause-card">
+      <div class="pause-icon-badge">⏸️</div>
+      <div class="game-logo" style="font-size: 26px; margin-bottom: 12px; letter-spacing: 1px;">GAME PAUSED</div>
+
+      <button id="pause-music-btn" class="music-pill-btn" title="Toggle Music" style="margin-bottom: 14px;">
+        <span>🎵</span>
+        <span>Music: Playing</span>
+      </button>
+
+      <button id="resume-btn" class="primary-btn" style="width: 100%;">
+        <span>▶</span>
+        <span>RESUME</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Complete Vanilla JavaScript Game Logic -->
+  <script>
+  (function() {
+    'use strict';
+
+    /* ==========================================================================
+       1. WEB AUDIO API SYNTHESIZER (TETRIS CHIPTUNE + ZERO EXTERNAL DEPENDENCIES)
+       ========================================================================== */
+    // Authentic 8-Bit Tetris Theme A (Korobeiniki) Melody
+    const TETRIS_MELODY = [
+      // Section A - Bar 1
+      { f: 659.25, d: 2 }, // E5
+      { f: 493.88, d: 1 }, // B4
+      { f: 523.25, d: 1 }, // C5
+      { f: 587.33, d: 2 }, // D5
+      { f: 523.25, d: 1 }, // C5
+      { f: 493.88, d: 1 }, // B4
+      // Bar 2
+      { f: 440.00, d: 2 }, // A4
+      { f: 440.00, d: 1 }, // A4
+      { f: 523.25, d: 1 }, // C5
+      { f: 659.25, d: 2 }, // E5
+      { f: 587.33, d: 1 }, // D5
+      { f: 523.25, d: 1 }, // C5
+      // Bar 3
+      { f: 493.88, d: 3 }, // B4
+      { f: 523.25, d: 1 }, // C5
+      { f: 587.33, d: 2 }, // D5
+      { f: 659.25, d: 2 }, // E5
+      // Bar 4
+      { f: 523.25, d: 2 }, // C5
+      { f: 440.00, d: 2 }, // A4
+      { f: 440.00, d: 2 }, // A4
+      { f: 0,      d: 2 }, // Rest
+      // Section B - Bar 5
+      { f: 587.33, d: 3 }, // D5
+      { f: 698.46, d: 1 }, // F5
+      { f: 880.00, d: 2 }, // A5
+      { f: 783.99, d: 1 }, // G5
+      { f: 698.46, d: 1 }, // F5
+      // Bar 6
+      { f: 659.25, d: 3 }, // E5
+      { f: 523.25, d: 1 }, // C5
+      { f: 659.25, d: 2 }, // E5
+      { f: 587.33, d: 1 }, // D5
+      { f: 523.25, d: 1 }, // C5
+      // Bar 7
+      { f: 493.88, d: 2 }, // B4
+      { f: 493.88, d: 1 }, // B4
+      { f: 523.25, d: 1 }, // C5
+      { f: 587.33, d: 2 }, // D5
+      { f: 659.25, d: 2 }, // E5
+      // Bar 8
+      { f: 523.25, d: 2 }, // C5
+      { f: 440.00, d: 2 }, // A4
+      { f: 440.00, d: 2 }, // A4
+      { f: 0,      d: 2 }  // Rest
+    ];
+
+    // Bouncy 8-bit Tetris bassline (64 eighth-notes loop)
+    const TETRIS_BASS = [
+      // Bar 1 (E / G#)
+      164.81, 82.41, 164.81, 82.41, 207.65, 103.83, 207.65, 103.83,
+      // Bar 2 (A)
+      110.00, 55.00, 110.00, 55.00, 110.00, 55.00, 110.00, 55.00,
+      // Bar 3 (G# / E)
+      207.65, 103.83, 207.65, 103.83, 164.81, 82.41, 164.81, 82.41,
+      // Bar 4 (A)
+      110.00, 55.00, 110.00, 55.00, 110.00, 55.00, 110.00, 55.00,
+      // Bar 5 (D)
+      146.83, 73.42, 146.83, 73.42, 146.83, 73.42, 146.83, 73.42,
+      // Bar 6 (C)
+      130.81, 65.41, 130.81, 65.41, 130.81, 65.41, 130.81, 65.41,
+      // Bar 7 (E)
+      164.81, 82.41, 164.81, 82.41, 164.81, 82.41, 164.81, 82.41,
+      // Bar 8 (A)
+      110.00, 55.00, 110.00, 55.00, 110.00, 55.00, 110.00, 55.00
+    ];
+
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.isMuted = false;
+        this.masterGain = null;
+        this.bgmGain = null;
+        this.sfxGain = null;
+        this.noiseBuffer = null;
+        this.lastSwipeTime = 0;
+
+        // Tetris BGM Sequencer state
+        this.bgmTimer = null;
+        this.eighthDur = 60 / 144 / 2; // ~0.208s per eighth note at 144 BPM
+        this.nextNoteTime = 0;
+        this.bassStep = 0;
+        this.melodyIdx = 0;
+        this.melodyRemain = TETRIS_MELODY[0].d;
+
+        // Custom music support
+        this.customAudio = null;
+        this.useCustomAudio = false;
+        this.customTrackName = '';
+      }
+
+      init() {
+        try {
+          if (!this.ctx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+            this.ctx = new AudioContextClass();
+
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 1.0, this.ctx.currentTime);
+            this.masterGain.connect(this.ctx.destination);
+
+            this.sfxGain = this.ctx.createGain();
+            this.sfxGain.gain.setValueAtTime(0.75, this.ctx.currentTime);
+            this.sfxGain.connect(this.masterGain);
+
+            this.bgmGain = this.ctx.createGain();
+            this.bgmGain.gain.setValueAtTime(0.24, this.ctx.currentTime);
+            this.bgmGain.connect(this.masterGain);
+
+            // Pre-allocate 1s noise buffer so swipe sounds never cause garbage collection lag
+            const bufferSize = Math.floor(this.ctx.sampleRate * 1.0);
+            this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = this.noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+              data[i] = Math.random() * 2 - 1;
+            }
+          }
+
+          if (this.ctx.state === 'suspended') {
+            this.ctx.resume().then(() => {
+              if (!this.isMuted) this.startBGM();
+            }).catch(() => {});
+          } else {
+            if (!this.isMuted) this.startBGM();
+          }
+        } catch (e) {
+          console.warn('Web Audio init error:', e);
+        }
+      }
+
+      unlock() {
+        if (!this.ctx) {
+          this.init();
+        } else if (this.ctx.state === 'suspended') {
+          this.ctx.resume().then(() => {
+            if (!this.isMuted) this.startBGM();
+          }).catch(() => {});
+        } else {
+          if (!this.bgmTimer && !this.isMuted && !this.useCustomAudio) {
+            this.startBGM();
+          }
+        }
+      }
+
+      toggleMute() {
+        this.isMuted = !this.isMuted;
+        if (this.masterGain && this.ctx) {
+          this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 1.0, this.ctx.currentTime);
+        }
+        if (this.customAudio) {
+          this.customAudio.muted = this.isMuted;
+          if (!this.isMuted && this.customAudio.paused && this.useCustomAudio) {
+            this.customAudio.play().catch(() => {});
+          }
+        }
+        if (this.isMuted) {
+          this.stopBGM();
+        } else {
+          this.startBGM();
+        }
+        return this.isMuted;
+      }
+
+      pauseMusic() {
+        this.stopBGM();
+      }
+
+      resumeMusic() {
+        if (!this.isMuted) {
+          this.startBGM();
+        }
+      }
+
+      // --- Custom Audio Functions ---
+      setCustomAudio(file) {
+        if (!file) return;
+        if (!this.customAudio) {
+          this.customAudio = new Audio();
+          this.customAudio.loop = true;
+        }
+        try {
+          const url = URL.createObjectURL(file);
+          this.customAudio.src = url;
+          this.customTrackName = file.name;
+          this.useCustomAudio = true;
+          this.stopBGM(); // Pause chiptune Tetris
+          if (!this.isMuted) {
+            this.customAudio.play().catch(e => console.warn('Custom audio playback:', e));
+          }
+        } catch(e) {
+          console.warn('Error loading custom audio:', e);
+        }
+      }
+
+      switchToTetris() {
+        this.useCustomAudio = false;
+        this.customTrackName = '';
+        if (this.customAudio) {
+          this.customAudio.pause();
+        }
+        if (!this.isMuted) {
+          this.startBGM();
+        }
+      }
+
+      // --- Sound Effects ---
+      // Disinfectant aerosol spray swipe whoosh (reusing pre-allocated noise buffer)
+      playSwipe() {
+        if (!this.ctx || this.isMuted || !this.noiseBuffer) return;
+        const now = performance.now();
+        if (now - this.lastSwipeTime < 90) return; // Debounce fast micro-jitters
+        this.lastSwipeTime = now;
+        try {
+          const t = this.ctx.currentTime;
+          const noise = this.ctx.createBufferSource();
+          noise.buffer = this.noiseBuffer;
+
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(1400, t);
+          filter.frequency.exponentialRampToValueAtTime(3200, t + 0.08);
+          filter.Q.setValueAtTime(2.2, t);
+
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.01, t);
+          gain.gain.linearRampToValueAtTime(0.24, t + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.sfxGain);
+          noise.start(t);
+          noise.stop(t + 0.13);
+        } catch(e) {}
+      }
+
+      // Pathogen slice pop & squelch
+      playSlicePathogen(comboCount = 1) {
+        if (!this.ctx || this.isMuted) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          const baseFreq = Math.min(880 + comboCount * 120, 1800);
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(baseFreq, t);
+          osc.frequency.exponentialRampToValueAtTime(140, t + 0.14);
+
+          gain.gain.setValueAtTime(0.35, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+
+          osc.connect(gain);
+          gain.connect(this.sfxGain);
+          osc.start(t);
+          osc.stop(t + 0.15);
+        } catch(e) {}
+      }
+
+      // Escaped Pathogen (Missed bad bacteria penalty) warning drop tone
+      playMissedPathogen() {
+        if (!this.ctx || this.isMuted) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(260, t);
+          osc.frequency.exponentialRampToValueAtTime(80, t + 0.28);
+
+          gain.gain.setValueAtTime(0.42, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+
+          osc.connect(gain);
+          gain.connect(this.sfxGain);
+          osc.start(t);
+          osc.stop(t + 0.29);
+        } catch(e) {}
+      }
+
+      // Slicing beneficial microbe: error buzzer
+      playErrorBuzzer() {
+        if (!this.ctx || this.isMuted) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc1 = this.ctx.createOscillator();
+          const osc2 = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc1.type = 'sawtooth';
+          osc2.type = 'square';
+          osc1.frequency.setValueAtTime(160, t);
+          osc2.frequency.setValueAtTime(115, t);
+
+          gain.gain.setValueAtTime(0.4, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(this.sfxGain);
+
+          osc1.start(t);
+          osc2.start(t);
+          osc1.stop(t + 0.36);
+          osc2.stop(t + 0.36);
+        } catch(e) {}
+      }
+
+      // MRSA Superbug metallic shield deflect
+      playShieldHit() {
+        if (!this.ctx || this.isMuted) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1480, t);
+          osc.frequency.exponentialRampToValueAtTime(740, t + 0.18);
+
+          gain.gain.setValueAtTime(0.4, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+
+          osc.connect(gain);
+          gain.connect(this.sfxGain);
+          osc.start(t);
+          osc.stop(t + 0.2);
+        } catch(e) {}
+      }
+
+      // Bacteriophage full screen lysis blast
+      playPhageBlast() {
+        if (!this.ctx || this.isMuted) return;
+        try {
+          const t = this.ctx.currentTime;
+          const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+          notes.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const delay = idx * 0.04;
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, t + delay);
+            gain.gain.setValueAtTime(0.2, t + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.3);
+
+            osc.connect(gain);
+            gain.connect(this.sfxGain);
+            osc.start(t + delay);
+            osc.stop(t + delay + 0.32);
+          });
+        } catch(e) {}
+      }
+
+      // Biohazard explosion boom
+      playExplosion() {
+        if (!this.ctx || this.isMuted) return;
+        try {
+          const t = this.ctx.currentTime;
+          const bufferSource = this.ctx.createBufferSource();
+          bufferSource.buffer = this.noiseBuffer;
+
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(350, t);
+          filter.frequency.exponentialRampToValueAtTime(40, t + 0.55);
+
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.8, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+
+          bufferSource.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.sfxGain);
+          bufferSource.start(t);
+          bufferSource.stop(t + 0.62);
+        } catch(e) {}
+      }
+
+      // Life Restored Chime (Ascending 4-note chime)
+      playLifeRestored() {
+        if (!this.ctx || this.isMuted) return;
+        try {
+          const t = this.ctx.currentTime;
+          const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+          notes.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const delay = idx * 0.07;
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t + delay);
+            gain.gain.setValueAtTime(0.25, t + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.35);
+
+            osc.connect(gain);
+            gain.connect(this.sfxGain);
+            osc.start(t + delay);
+            osc.stop(t + delay + 0.36);
+          });
+        } catch(e) {}
+      }
+
+      // --- Chiptune Synthesis Primitives ---
+      playChipNote(freq, t, duration, waveType = 'square', volume = 0.16, filterCutoff = 2400) {
+        try {
+          const osc = this.ctx.createOscillator();
+          const filter = this.ctx.createBiquadFilter();
+          const gain = this.ctx.createGain();
+
+          osc.type = waveType;
+          osc.frequency.setValueAtTime(freq, t);
+
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(filterCutoff, t);
+          filter.frequency.exponentialRampToValueAtTime(300, t + duration);
+
+          gain.gain.setValueAtTime(volume, t);
+          gain.gain.setValueAtTime(volume * 0.8, t + duration * 0.7);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.bgmGain);
+
+          osc.start(t);
+          osc.stop(t + duration);
+        } catch(e) {}
+      }
+
+      playRetroDrum(t, startFreq = 120, endFreq = 40, duration = 0.08, volume = 0.2) {
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.frequency.setValueAtTime(startFreq, t);
+          osc.frequency.exponentialRampToValueAtTime(endFreq, t + duration);
+          gain.gain.setValueAtTime(volume, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+          osc.connect(gain);
+          gain.connect(this.bgmGain);
+          osc.start(t);
+          osc.stop(t + duration);
+        } catch(e) {}
+      }
+
+      playSnareTap(t, duration = 0.06, volume = 0.1) {
+        if (!this.noiseBuffer) return;
+        try {
+          const noise = this.ctx.createBufferSource();
+          noise.buffer = this.noiseBuffer;
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'highpass';
+          filter.frequency.setValueAtTime(1600, t);
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(volume, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.bgmGain);
+          noise.start(t);
+          noise.stop(t + duration);
+        } catch(e) {}
+      }
+
+      // --- Tetris Lookahead Sequencer Loop ---
+      scheduleNextNotes() {
+        if (!this.ctx || this.isMuted || this.useCustomAudio || this.ctx.state !== 'running') return;
+        const lookAhead = 0.3; // 300ms lookahead
+        while (this.nextNoteTime < this.ctx.currentTime + lookAhead) {
+          const t = this.nextNoteTime;
+          const bassFreq = TETRIS_BASS[this.bassStep];
+          const mel = TETRIS_MELODY[this.melodyIdx];
+
+          // Play melody lead note on square wave with retro decay
+          if (this.melodyRemain === mel.d && mel.f > 0) {
+            this.playChipNote(mel.f, t, mel.d * this.eighthDur * 0.88, 'square', 0.16, 2200);
+          }
+
+          // Play bouncy chip bass note on triangle wave
+          if (bassFreq > 0) {
+            this.playChipNote(bassFreq, t, this.eighthDur * 0.58, 'triangle', 0.22, 600);
+          }
+
+          // Subtle rhythm beats
+          if (this.bassStep % 4 === 0) {
+            this.playRetroDrum(t, 120, 42, 0.08, 0.2);
+          } else if (this.bassStep % 4 === 2) {
+            this.playSnareTap(t, 0.06, 0.1);
+          }
+
+          // Advance sequencer
+          this.nextNoteTime += this.eighthDur;
+          this.bassStep = (this.bassStep + 1) % 64;
+          this.melodyRemain--;
+          if (this.melodyRemain <= 0) {
+            this.melodyIdx = (this.melodyIdx + 1) % TETRIS_MELODY.length;
+            this.melodyRemain = TETRIS_MELODY[this.melodyIdx].d;
+          }
+        }
+      }
+
+      startBGM() {
+        if (this.useCustomAudio) {
+          if (this.customAudio && !this.isMuted) {
+            this.customAudio.play().catch(() => {});
+          }
+          return;
+        }
+        if (this.bgmTimer) return;
+        if (!this.ctx) return;
+        this.nextNoteTime = this.ctx.currentTime + 0.05;
+        this.bgmTimer = setInterval(() => {
+          this.scheduleNextNotes();
+        }, 35);
+      }
+
+      stopBGM() {
+        if (this.bgmTimer) {
+          clearInterval(this.bgmTimer);
+          this.bgmTimer = null;
+        }
+        if (this.customAudio) {
+          this.customAudio.pause();
+        }
+      }
+    }
+
+    /* ==========================================================================
+       2. MICROBIOLOGY DATABASE & MORPHOLOGY DEFINITIONS
+       ========================================================================== */
+    const MICROBE_TYPES = {
+      // --- BAD PATHOGENS (VIBRANT RED - SLICE TO STERILIZE) ---
+      S_AUREUS: {
+        id: 's_aureus',
+        name: 'S. aureus',
+        fullName: 'Staphylococcus aureus',
+        gram: 'positive',
+        type: 'pathogen',
+        morphology: 'cocci_cluster',
+        baseColor: '#dc2626', // Red
+        accentColor: '#f87171', // Bright coral highlight
+        radius: 38,
+        points: 100,
+        fact: '🔴 BAD PATHOGEN: Staphylococcus aureus forms grape-like clusters; causes painful skin boils, abscesses, and toxic shock syndrome.'
+      },
+      E_COLI: {
+        id: 'e_coli',
+        name: 'E. coli O157:H7',
+        fullName: 'Escherichia coli O157:H7',
+        gram: 'negative',
+        type: 'pathogen',
+        morphology: 'bacillus_flagellated',
+        baseColor: '#ef4444', // Red
+        accentColor: '#fca5a5',
+        radius: 36,
+        points: 100,
+        fact: '🔴 BAD PATHOGEN: Motile rod with peritrichous flagella; produces lethal Shiga toxins causing severe food poisoning.'
+      },
+      SALMONELLA: {
+        id: 'salmonella',
+        name: 'S. enterica',
+        fullName: 'Salmonella enterica',
+        gram: 'negative',
+        type: 'pathogen',
+        morphology: 'bacillus_slender',
+        baseColor: '#b91c1c', // Crimson Red
+        accentColor: '#f87171',
+        radius: 35,
+        points: 110,
+        fact: '🔴 BAD PATHOGEN: Slender motile bacillus; invades epithelial cells via needle complexes causing salmonellosis.'
+      },
+      CANDIDA: {
+        id: 'candida',
+        name: 'C. albicans',
+        fullName: 'Candida albicans',
+        gram: 'positive',
+        type: 'pathogen',
+        morphology: 'budding_fungus',
+        baseColor: '#dc2626', // Red
+        accentColor: '#fca5a5',
+        radius: 40,
+        points: 120,
+        fact: '🔴 BAD FUNGUS: Opportunistic fungal yeast; transforms into invasive hyphal filaments during candidiasis infections.'
+      },
+      PSEUDOMONAS: {
+        id: 'pseudomonas',
+        name: 'P. aeruginosa',
+        fullName: 'Pseudomonas aeruginosa',
+        gram: 'negative',
+        type: 'pathogen',
+        morphology: 'bacillus_pyocyanin',
+        baseColor: '#ef4444', // Red
+        accentColor: '#f87171',
+        radius: 36,
+        points: 130,
+        fact: '🔴 BAD PATHOGEN: Hospital superbug forming indestructible biofilms in surgical wounds and respiratory tracts.'
+      },
+      VIRUS: {
+        id: 'virus',
+        name: 'Norovirus',
+        fullName: 'Human Norovirus Virion',
+        gram: 'non_cellular',
+        type: 'pathogen',
+        morphology: 'icosahedral_virus',
+        baseColor: '#dc2626', // Red
+        accentColor: '#fee2e2',
+        radius: 32,
+        points: 150,
+        fact: '🔴 BAD VIRUS: Non-enveloped icosahedral virion; highly contagious cause of acute gastroenteritis, dissolved by disinfectant.'
+      },
+
+      // --- GOOD BENEFICIAL FLORA (VIBRANT GREEN - SAVE! DO NOT SLICE) ---
+      LACTOBACILLUS: {
+        id: 'lactobacillus',
+        name: 'L. acidophilus',
+        fullName: 'Lactobacillus acidophilus',
+        gram: 'positive',
+        type: 'beneficial',
+        morphology: 'bacillus_probiotic',
+        baseColor: '#16a34a', // Bright Green
+        accentColor: '#4ade80', // Mint Green highlight
+        radius: 37,
+        points: -1,
+        fact: '🟢 GOOD FLORA: Essential probiotic rod fermenting lactic acid; maintains protective acidic pH against pathogens.'
+      },
+      SACCHAROMYCES: {
+        id: 'saccharomyces',
+        name: 'S. cerevisiae',
+        fullName: 'Saccharomyces cerevisiae',
+        gram: 'positive',
+        type: 'beneficial',
+        morphology: 'budding_yeast_round',
+        baseColor: '#22c55e', // Emerald Green
+        accentColor: '#86efac',
+        radius: 38,
+        points: -1,
+        fact: "🟢 GOOD FUNGUS: Brewer's & baker's yeast; beneficial model organism that produces bread, nutrients, and probiotics."
+      },
+      RHIZOBIUM: {
+        id: 'rhizobium',
+        name: 'R. leguminosarum',
+        fullName: 'Rhizobium leguminosarum',
+        gram: 'negative',
+        type: 'beneficial',
+        morphology: 'bacteroid_nodule',
+        baseColor: '#15803d', // Forest Green
+        accentColor: '#4ade80',
+        radius: 35,
+        points: -1,
+        fact: '🟢 GOOD BACTERIA: Symbiotic soil friend; lives in plant root nodules and converts atmospheric nitrogen into fertilizer!'
+      },
+      BIFIDO: {
+        id: 'bifido',
+        name: 'B. animalis',
+        fullName: 'Bifidobacterium animalis',
+        gram: 'positive',
+        type: 'beneficial',
+        morphology: 'bacillus_bifurcated',
+        baseColor: '#16a34a', // Bright Green
+        accentColor: '#86efac',
+        radius: 36,
+        points: -1,
+        fact: '🟢 GOOD FLORA: Branched probiotic rod; colonizes healthy infant intestines to support strong barrier immunity.'
+      },
+
+      // --- SPECIAL TARGETS ---
+      MRSA: {
+        id: 'mrsa',
+        name: 'MRSA Superbug',
+        fullName: 'Methicillin-Resistant S. aureus',
+        gram: 'positive',
+        type: 'superbug',
+        morphology: 'superbug_shielded',
+        baseColor: '#dc2626', // Red base with gold shield
+        accentColor: '#eab308', // Gold armored shield
+        radius: 46,
+        points: 300,
+        hitsNeeded: 3,
+        fact: '⚠️ SUPERBUG: Methicillin-resistant S. aureus shielded by PBP2a! Requires 3 disinfectant strikes to break shield!'
+      },
+      PHAGE: {
+        id: 'phage',
+        name: 'Bacteriophage T4',
+        fullName: 'Enterobacteria Phage T4',
+        gram: 'powerup',
+        type: 'powerup',
+        morphology: 'bacteriophage',
+        baseColor: '#06b6d4',
+        accentColor: '#67e8f9',
+        radius: 34,
+        points: 200,
+        fact: '⚡ PHAGE THERAPY: Bacterial predator virus! Slicing injects genome to trigger rapid lytic explosion of all screen pathogens!'
+      },
+      BIOHAZARD: {
+        id: 'biohazard',
+        name: 'Biohazard Spore',
+        fullName: 'Lethal Autoclave Contamination',
+        gram: 'hazard',
+        type: 'hazard',
+        morphology: 'biohazard_bomb',
+        baseColor: '#0f172a',
+        accentColor: '#eab308',
+        radius: 38,
+        points: 0,
+        fact: '☣️ BIOHAZARD BOMB: Lethal autoclave leak! Slicing it contaminates the entire laboratory and ends the run!'
+      }
+    };
+
+    /* ==========================================================================
+       3. GEOMETRY & COLLISION UTILITIES
+       ========================================================================== */
+    // Distance from point (px, py) to line segment (x1, y1) -> (x2, y2)
+    function distToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) {
+        const ddx = px - x1;
+        const ddy = py - y1;
+        return Math.sqrt(ddx * ddx + ddy * ddy);
+      }
+      let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+      const projX = x1 + t * dx;
+      const projY = y1 + t * dy;
+      const ddx = px - projX;
+      const ddy = py - projY;
+      return Math.sqrt(ddx * ddx + ddy * ddy);
+    }
+
+    /* ==========================================================================
+       4. GAME STATE & VARIABLES
+       ========================================================================== */
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    const sound = new SoundEngine();
+
+    // UI elements
+    const scoreDisplay = document.getElementById('score-display');
+    const highScoreDisplay = document.getElementById('high-score-display');
+    const factBanner = document.getElementById('fact-banner');
+    const factLabel = document.getElementById('fact-label');
+    const factBody = document.getElementById('fact-body');
+    const startModal = document.getElementById('start-modal');
+    const gameoverModal = document.getElementById('gameover-modal');
+    const factsModal = document.getElementById('facts-modal');
+    const pauseModal = document.getElementById('pause-modal');
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const startMusicBtn = document.getElementById('start-music-btn');
+    const gameoverFactsBtn = document.getElementById('gameover-facts-btn');
+    const returnStartBtn = document.getElementById('return-start-btn');
+    const musicBtn = document.getElementById('music-btn');
+    const customMusicFile = document.getElementById('custom-music-file');
+    const pauseBtn = document.getElementById('pause-btn');
+    const resumeBtn = document.getElementById('resume-btn');
+    const pauseMusicBtn = document.getElementById('pause-music-btn');
+    const gameoverMusicBtn = document.getElementById('gameover-music-btn');
+    const factsMusicBtn = document.getElementById('facts-music-btn');
+    const finalScoreEl = document.getElementById('final-score');
+    const finalHighScoreEl = document.getElementById('final-high-score');
+    const finalMaxComboEl = document.getElementById('final-max-combo');
+    const finalBestStreakEl = document.getElementById('final-best-streak');
+    const finalPerformanceEl = document.getElementById('final-performance');
+    const gameoverReasonEl = document.getElementById('gameover-reason');
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    let gameState = 'START'; // 'START' | 'PLAYING' | 'GAMEOVER'
+    let score = 0;
+    let highScore = parseInt(localStorage.getItem('gramslash_highscore') || '0', 10);
+    let lives = 5;
+    let pathogensSterilized = 0;
+    let pathogenStreak = 0;
+    let bestStreak = 0;
+    let currentCombo = 0;
+    let maxCombo = 0;
+    let lastSliceTimestamp = 0;
+    let screenShake = 0;
+    let gameTime = 0;
+    let nextSpawnTime = 1.0;
+    const GRAVITY = 350; // Tuned for graceful, slow-falling float time
+
+    // Spawning queue to prevent clumped/clustered simultaneous spawns
+    const spawnQueue = [];
+    let lastSpawnX = -999;
+
+    // Disinfectant Swipe Trail
+    const swipeTrail = []; // { x, y, time }
+    let isInteracting = false;
+    let currentSwipePoints = [];
+
+    // Pools & Entities
+    const microbes = [];
+    const slicedHalves = [];
+    const particles = [];
+    const floatingTexts = [];
+
+    /* ==========================================================================
+       5. CANVAS RESIZING & INITIALIZATION
+       ========================================================================== */
+    function resizeCanvas() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', resizeCanvas);
+    resizeCanvas();
+
+    highScoreDisplay.textContent = 'Best: ' + highScore;
+
+    function updateLivesHUD() {
+      for (let i = 0; i < 5; i++) {
+        const dish = document.getElementById('petri-' + i);
+        if (dish) {
+          if (i < lives) {
+            dish.classList.remove('lost');
+          } else {
+            dish.classList.add('lost');
+          }
+        }
+      }
+    }
+
+    function showFact(title, text, isAlert = false) {
+      factLabel.textContent = title;
+      factBody.textContent = text;
+      factBanner.style.borderColor = isAlert ? 'rgba(239, 68, 68, 0.7)' : 'rgba(56, 189, 248, 0.5)';
+      factBanner.style.transform = 'scale(1.03)';
+      setTimeout(() => {
+        factBanner.style.transform = 'scale(1)';
+      }, 200);
+    }
+
+    /* ==========================================================================
+       6. PROCEDURAL RENDERING OF MICROBES (CANVAS 2D)
+       ========================================================================== */
+    class Microbe {
+      constructor() {
+        this.active = false;
+      }
+
+      init(def, x, y, vx, vy, rotSpeed, gravity = GRAVITY) {
+        this.def = def;
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotSpeed = rotSpeed;
+        this.radius = def.radius;
+        this.active = true;
+        this.hitsLeft = def.hitsNeeded || 1;
+        this.wobble = Math.random() * Math.PI * 2;
+        this.gravity = gravity;
+      }
+
+      update(dt) {
+        this.vy += this.gravity * dt;
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.rotation += this.rotSpeed * dt;
+        this.wobble += 5 * dt;
+
+        // Microbe fell off bottom screen
+        if (this.y > height + 80 && this.vy > 0) {
+          this.active = false;
+          // Penalize missing bad bacteria: letting a pathogen/superbug escape takes away a heart!
+          if (gameState === 'PLAYING' && (this.def.type === 'pathogen' || this.def.type === 'superbug')) {
+            pathogenStreak = 0; // Reset streak
+            lives--;
+            updateLivesHUD();
+            sound.playMissedPathogen();
+            screenShake = 6;
+            const textX = Math.max(70, Math.min(width - 70, this.x));
+            spawnFloatingText('-1 HEART! ESCAPED PATHOGEN!', textX, height - 50, '#ef4444', 18);
+            showFact('⚠️ Pathogen Escaped!', `A red ${this.def.fullName} slipped past sterilization! (-1 Heart)`, true);
+            if (lives <= 0) {
+              triggerGameOver('Pathogens escaped into the facility! Containment breached.');
+            }
+          }
+        }
+      }
+
+      draw(c) {
+        c.save();
+        c.translate(this.x, this.y);
+        c.rotate(this.rotation);
+
+        const def = this.def;
+
+        // 1. Draw Vibrant Aura (Red for Bad Pathogens, Green for Good Flora)
+        if (def.type === 'pathogen' || def.type === 'superbug') {
+          // Intense Red danger aura
+          const pulse = 0.45 + 0.18 * Math.sin(this.wobble);
+          const grad = c.createRadialGradient(0, 0, this.radius * 0.6, 0, 0, this.radius * 1.55);
+          grad.addColorStop(0, `rgba(239, 68, 68, ${pulse})`);
+          grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+          c.fillStyle = grad;
+          c.beginPath();
+          c.arc(0, 0, this.radius * 1.55, 0, Math.PI * 2);
+          c.fill();
+        } else if (def.type === 'beneficial') {
+          // Vibrant Green protective halo
+          const pulse = 0.5 + 0.18 * Math.cos(this.wobble);
+          const grad = c.createRadialGradient(0, 0, this.radius * 0.6, 0, 0, this.radius * 1.55);
+          grad.addColorStop(0, `rgba(34, 197, 94, ${pulse})`);
+          grad.addColorStop(1, 'rgba(34, 197, 94, 0)');
+          c.fillStyle = grad;
+          c.beginPath();
+          c.arc(0, 0, this.radius * 1.55, 0, Math.PI * 2);
+          c.fill();
+        } else if (def.type === 'powerup') {
+          // Cyan electric energy ring
+          const grad = c.createRadialGradient(0, 0, this.radius * 0.6, 0, 0, this.radius * 1.6);
+          grad.addColorStop(0, 'rgba(6, 182, 212, 0.6)');
+          grad.addColorStop(1, 'rgba(6, 182, 212, 0)');
+          c.fillStyle = grad;
+          c.beginPath();
+          c.arc(0, 0, this.radius * 1.6, 0, Math.PI * 2);
+          c.fill();
+        } else if (def.type === 'hazard') {
+          // Toxic warning aura
+          const grad = c.createRadialGradient(0, 0, this.radius * 0.7, 0, 0, this.radius * 1.4);
+          grad.addColorStop(0, 'rgba(234, 179, 8, 0.6)');
+          grad.addColorStop(1, 'rgba(234, 179, 8, 0)');
+          c.fillStyle = grad;
+          c.beginPath();
+          c.arc(0, 0, this.radius * 1.4, 0, Math.PI * 2);
+          c.fill();
+        }
+
+        // 2. Procedural Morphology Drawing
+        switch (def.morphology) {
+          case 'cocci_cluster':
+            this.drawCocciCluster(c, def);
+            break;
+          case 'bacillus_flagellated':
+            this.drawBacillus(c, def, true);
+            break;
+          case 'bacillus_slender':
+            this.drawBacillus(c, def, false);
+            break;
+          case 'bacillus_pyocyanin':
+            this.drawPseudomonas(c, def);
+            break;
+          case 'budding_fungus':
+            this.drawBuddingFungus(c, def);
+            break;
+          case 'icosahedral_virus':
+            this.drawVirus(c, def);
+            break;
+          case 'bacillus_probiotic':
+            this.drawBacillus(c, def, false);
+            break;
+          case 'budding_yeast_round':
+            this.drawYeastRound(c, def);
+            break;
+          case 'bacteroid_nodule':
+            this.drawBacteroid(c, def);
+            break;
+          case 'bacillus_bifurcated':
+            this.drawBifido(c, def);
+            break;
+          case 'superbug_shielded':
+            this.drawMRSA(c, def);
+            break;
+          case 'bacteriophage':
+            this.drawPhage(c, def);
+            break;
+          case 'biohazard_bomb':
+            this.drawBiohazardBomb(c, def);
+            break;
+        }
+
+        c.restore();
+
+        // 3. Name Label & Crystal-Clear Classification Tag (drawn unrotated for perfect legibility)
+        c.save();
+        c.translate(this.x, this.y);
+        c.textAlign = 'center';
+
+        const labelY = this.radius + 15;
+        c.font = 'bold 11px system-ui, sans-serif';
+
+        // Badge styling based on Good (Green) vs Bad (Red)
+        const isBad = def.type === 'pathogen' || def.type === 'superbug';
+        const isGood = def.type === 'beneficial';
+        const isPower = def.type === 'powerup';
+        const isBomb = def.type === 'hazard';
+
+        const strokeColor = isBad ? '#ef4444' : (isGood ? '#22c55e' : (isPower ? '#06b6d4' : '#eab308'));
+        const prefix = isBad ? '🔴 ' : (isGood ? '🟢 ' : (isPower ? '⚡ ' : '☣️ '));
+        const nameText = prefix + def.name;
+        const textWidth = c.measureText(nameText).width;
+
+        // Label pill background
+        c.fillStyle = 'rgba(10, 15, 30, 0.9)';
+        c.fillRect(-textWidth / 2 - 8, labelY - 11, textWidth + 16, 18);
+        c.strokeStyle = strokeColor;
+        c.lineWidth = 1.5;
+        c.strokeRect(-textWidth / 2 - 8, labelY - 11, textWidth + 16, 18);
+
+        // Name text
+        c.fillStyle = isBad ? '#fca5a5' : (isGood ? '#86efac' : (isPower ? '#e0f2fe' : '#fef08a'));
+        c.fillText(nameText, 0, labelY + 2);
+
+        // Subtitle badge: SLICE vs SAVE
+        c.font = '900 9px system-ui, sans-serif';
+        if (isBad) {
+          c.fillStyle = '#ef4444';
+          c.fillText(def.type === 'superbug' ? `⚠️ 3 HITS (${this.hitsLeft}/3)` : 'BAD [SLICE!]', 0, labelY + 16);
+        } else if (isGood) {
+          c.fillStyle = '#22c55e';
+          c.fillText('GOOD [SAVE!]', 0, labelY + 16);
+        } else if (isPower) {
+          c.fillStyle = '#38bdf8';
+          c.fillText('POWER-UP [SLICE!]', 0, labelY + 16);
+        } else if (isBomb) {
+          c.fillStyle = '#eab308';
+          c.fillText('BOMB [DO NOT HIT!]', 0, labelY + 16);
+        }
+
+        c.restore();
+      }
+
+      // Draw Grape-like Staphylococcus Cocci Clusters (Red Bad Pathogen)
+      drawCocciCluster(c, def) {
+        const spheres = [
+          { x: 0, y: 0, r: 15 },
+          { x: -12, y: -9, r: 13 },
+          { x: 12, y: -8, r: 12 },
+          { x: -14, y: 10, r: 12 },
+          { x: 10, y: 11, r: 13 },
+          { x: 0, y: 16, r: 11 },
+          { x: 0, y: -16, r: 11 }
+        ];
+        spheres.forEach(s => {
+          const grad = c.createRadialGradient(s.x - 3, s.y - 3, 2, s.x, s.y, s.r);
+          grad.addColorStop(0, def.accentColor); // #f87171 bright coral
+          grad.addColorStop(0.35, def.baseColor); // #dc2626 vivid red
+          grad.addColorStop(1, '#7f1d1d'); // Dark red edge
+          c.fillStyle = grad;
+          c.beginPath();
+          c.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          c.fill();
+          c.strokeStyle = '#450a0a';
+          c.lineWidth = 1.5;
+          c.stroke();
+        });
+      }
+
+      // Draw Bacillus Rod (Red for Pathogens, Green for Lactobacillus)
+      drawBacillus(c, def, hasFlagella) {
+        const w = 48;
+        const h = 24;
+        const r = h / 2;
+        const isBeneficial = def.type === 'beneficial';
+
+        // Flagella (wavy curves)
+        if (hasFlagella) {
+          c.strokeStyle = isBeneficial ? 'rgba(74, 222, 128, 0.6)' : 'rgba(248, 113, 113, 0.6)';
+          c.lineWidth = 1.8;
+          for (let i = -1; i <= 1; i++) {
+            c.beginPath();
+            c.moveTo(-w / 2, i * 6);
+            c.bezierCurveTo(-w / 2 - 12, i * 10 + Math.sin(this.wobble) * 6, -w / 2 - 20, i * 5, -w / 2 - 30, i * 8);
+            c.stroke();
+          }
+        }
+
+        // Capsule Body
+        const grad = c.createLinearGradient(-w / 2, -h / 2, -w / 2, h / 2);
+        grad.addColorStop(0, def.accentColor);
+        grad.addColorStop(0.35, def.baseColor);
+        grad.addColorStop(1, isBeneficial ? '#14532d' : '#7f1d1d');
+        c.fillStyle = grad;
+        c.beginPath();
+        c.roundRect(-w / 2, -h / 2, w, h, r);
+        c.fill();
+        c.strokeStyle = isBeneficial ? '#052e16' : '#450a0a';
+        c.lineWidth = 2;
+        c.stroke();
+
+        // Inner DNA nucleoid ripple
+        c.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        c.lineWidth = 1.8;
+        c.beginPath();
+        c.moveTo(-14, 0);
+        c.bezierCurveTo(-7, -4, 0, 4, 7, -3);
+        c.lineTo(14, 0);
+        c.stroke();
+      }
+
+      // Draw Pseudomonas Aeruginosa with biofilm warning ring
+      drawPseudomonas(c, def) {
+        this.drawBacillus(c, def, true);
+        // Red Biofilm warning halo
+        c.strokeStyle = 'rgba(248, 113, 113, 0.8)';
+        c.lineWidth = 2.5;
+        c.setLineDash([4, 4]);
+        c.beginPath();
+        c.roundRect(-26, -14, 52, 28, 14);
+        c.stroke();
+        c.setLineDash([]);
+      }
+
+      // Draw Dimorphic Candida Yeast with daughter bud (Red Bad Fungus)
+      drawBuddingFungus(c, def) {
+        // Main cell
+        const grad = c.createRadialGradient(-4, -4, 4, 0, 0, 20);
+        grad.addColorStop(0, def.accentColor);
+        grad.addColorStop(0.6, def.baseColor);
+        grad.addColorStop(1, '#7f1d1d');
+        c.fillStyle = grad;
+        c.beginPath();
+        c.ellipse(0, 0, 22, 18, 0, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = '#450a0a';
+        c.lineWidth = 2;
+        c.stroke();
+
+        // Budding daughter cell
+        const budGrad = c.createRadialGradient(16, -10, 2, 18, -10, 11);
+        budGrad.addColorStop(0, '#fee2e2');
+        budGrad.addColorStop(1, def.baseColor);
+        c.fillStyle = budGrad;
+        c.beginPath();
+        c.arc(18, -10, 11, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = '#450a0a';
+        c.stroke();
+
+        // Bud scar ring
+        c.strokeStyle = '#fbbf24';
+        c.lineWidth = 1.5;
+        c.beginPath();
+        c.arc(10, -5, 4, 0, Math.PI * 2);
+        c.stroke();
+      }
+
+      // Draw Baker's / Brewer's Yeast (Vibrant Green Good Fungus)
+      drawYeastRound(c, def) {
+        const grad = c.createRadialGradient(-5, -5, 4, 0, 0, 22);
+        grad.addColorStop(0, def.accentColor);
+        grad.addColorStop(0.5, def.baseColor);
+        grad.addColorStop(1, '#14532d');
+        c.fillStyle = grad;
+        c.beginPath();
+        c.arc(0, 0, 22, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = '#052e16';
+        c.lineWidth = 2;
+        c.stroke();
+
+        // Bud scar rings (chitin collar)
+        c.strokeStyle = '#86efac';
+        c.lineWidth = 2;
+        c.beginPath();
+        c.arc(12, 8, 5, 0, Math.PI * 2);
+        c.stroke();
+      }
+
+      // Draw Norovirus / Influenza Virion (Red Bad Virus)
+      drawVirus(c, def) {
+        // Spikes
+        const spikes = 12;
+        c.fillStyle = '#dc2626';
+        for (let i = 0; i < spikes; i++) {
+          const angle = (i / spikes) * Math.PI * 2;
+          const sx = Math.cos(angle) * 22;
+          const sy = Math.sin(angle) * 22;
+          c.beginPath();
+          c.moveTo(Math.cos(angle) * 14, Math.sin(angle) * 14);
+          c.lineTo(sx, sy);
+          c.strokeStyle = '#dc2626';
+          c.lineWidth = 3;
+          c.stroke();
+          // Spike head
+          c.beginPath();
+          c.arc(sx, sy, 3.5, 0, Math.PI * 2);
+          c.fill();
+        }
+
+        // Spherical Capsid
+        const grad = c.createRadialGradient(-3, -3, 3, 0, 0, 16);
+        grad.addColorStop(0, def.accentColor);
+        grad.addColorStop(0.6, def.baseColor);
+        grad.addColorStop(1, '#450a0a');
+        c.fillStyle = grad;
+        c.beginPath();
+        c.arc(0, 0, 15, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = '#7f1d1d';
+        c.lineWidth = 1.5;
+        c.stroke();
+      }
+
+      // Draw Rhizobium Root Nodule Bacteroid (Vibrant Green Good Soil Bacteria)
+      drawBacteroid(c, def) {
+        // Y-shaped curved morphology
+        c.fillStyle = def.baseColor;
+        c.strokeStyle = '#14532d';
+        c.lineWidth = 2;
+        c.beginPath();
+        c.arc(-10, 0, 10, Math.PI / 2, Math.PI * 1.5);
+        c.lineTo(12, -8);
+        c.arc(12, 0, 8, -Math.PI / 2, Math.PI / 2);
+        c.closePath();
+        c.fill();
+        c.stroke();
+        // Symbiotic nodule ring
+        c.strokeStyle = def.accentColor;
+        c.lineWidth = 1.5;
+        c.setLineDash([2, 3]);
+        c.beginPath();
+        c.arc(0, 0, 20, 0, Math.PI * 2);
+        c.stroke();
+        c.setLineDash([]);
+      }
+
+      // Draw Bifidobacterium (Vibrant Green Good Gut Flora)
+      drawBifido(c, def) {
+        c.strokeStyle = def.baseColor;
+        c.lineWidth = 10;
+        c.lineCap = 'round';
+        c.beginPath();
+        c.moveTo(0, 16);
+        c.lineTo(0, -2);
+        c.lineTo(-12, -16);
+        c.moveTo(0, -2);
+        c.lineTo(12, -16);
+        c.stroke();
+        c.strokeStyle = '#052e16';
+        c.lineWidth = 2;
+        c.stroke();
+      }
+
+      // Draw MRSA Superbug (Armored Staphylococcus Cluster with 3-Hit Energy Shield)
+      drawMRSA(c, def) {
+        this.drawCocciCluster(c, def);
+
+        // Gold antibiotic resistance force field
+        const shieldColor = this.hitsLeft === 3 ? '#eab308' : (this.hitsLeft === 2 ? '#f97316' : '#ef4444');
+        c.strokeStyle = shieldColor;
+        c.lineWidth = 3.5;
+        c.beginPath();
+        c.arc(0, 0, this.radius - 2, 0, Math.PI * 2);
+        c.stroke();
+
+        // 3 Health Segments Indicator
+        c.fillStyle = '#0f172a';
+        c.fillRect(-22, -this.radius - 12, 44, 8);
+        c.strokeStyle = shieldColor;
+        c.lineWidth = 1;
+        c.strokeRect(-22, -this.radius - 12, 44, 8);
+
+        const segW = 40 / 3;
+        for (let i = 0; i < this.hitsLeft; i++) {
+          c.fillStyle = shieldColor;
+          c.fillRect(-20 + i * segW, -this.radius - 10, segW - 2, 4);
+        }
+      }
+
+      // Draw Bacteriophage T4 (Icosahedral Head, Sheath, Tail Fibers)
+      drawPhage(c, def) {
+        // Icosahedral Head (Polygon)
+        c.fillStyle = '#0891b2';
+        c.strokeStyle = '#67e8f9';
+        c.lineWidth = 2;
+        c.beginPath();
+        const headR = 14;
+        const headY = -12;
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const hx = Math.cos(a) * headR;
+          const hy = headY + Math.sin(a) * headR;
+          if (i === 0) c.moveTo(hx, hy);
+          else c.lineTo(hx, hy);
+        }
+        c.closePath();
+        c.fill();
+        c.stroke();
+
+        // Helical Contractile Sheath (Tail)
+        c.strokeStyle = '#38bdf8';
+        c.lineWidth = 4;
+        c.beginPath();
+        c.moveTo(0, headY + headR);
+        c.lineTo(0, 10);
+        c.stroke();
+
+        // Baseplate & Spidery Tail Fibers
+        c.fillStyle = '#0284c7';
+        c.fillRect(-4, 9, 8, 3);
+
+        c.strokeStyle = '#a5f3fc';
+        c.lineWidth = 1.5;
+        const legs = [-14, -8, 8, 14];
+        legs.forEach(lx => {
+          c.beginPath();
+          c.moveTo(0, 11);
+          c.lineTo(lx * 0.5, 17);
+          c.lineTo(lx, 24);
+          c.stroke();
+        });
+      }
+
+      // Draw Biohazard Bomb (Toxic Orb with Trefoil Symbol & Sparkling Fuse)
+      drawBiohazardBomb(c, def) {
+        // Metallic bomb sphere
+        const grad = c.createRadialGradient(-6, -6, 4, 0, 0, 24);
+        grad.addColorStop(0, '#475569');
+        grad.addColorStop(0.6, '#0f172a');
+        grad.addColorStop(1, '#020617');
+        c.fillStyle = grad;
+        c.beginPath();
+        c.arc(0, 0, 22, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = '#eab308';
+        c.lineWidth = 2.5;
+        c.stroke();
+
+        // Biohazard Trefoil Symbol
+        c.fillStyle = '#eab308';
+        for (let i = 0; i < 3; i++) {
+          const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+          c.beginPath();
+          c.arc(Math.cos(a) * 9, Math.sin(a) * 9, 6.5, 0, Math.PI * 2);
+          c.fill();
+        }
+        // Center punch out
+        c.fillStyle = '#0f172a';
+        c.beginPath();
+        c.arc(0, 0, 5, 0, Math.PI * 2);
+        c.fill();
+
+        // Sparkling fuse
+        const fuseSpark = Math.sin(this.wobble * 3);
+        c.strokeStyle = '#f59e0b';
+        c.lineWidth = 2;
+        c.beginPath();
+        c.moveTo(0, -22);
+        c.quadraticCurveTo(8, -30, 4, -36);
+        c.stroke();
+        // Spark fire
+        c.fillStyle = fuseSpark > 0 ? '#ef4444' : '#fde047';
+        c.beginPath();
+        c.arc(4, -36, 4 + fuseSpark * 2, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+
+    /* ==========================================================================
+       7. SLICED HALF ENTITIES (ORGANIC BIOLOGICAL CLEAVAGE & LYSIS)
+       ========================================================================== */
+    class SlicedHalf {
+      constructor() {
+        this.active = false;
+      }
+
+      init(def, x, y, vx, vy, rot, rotSpeed, side) {
+        this.def = def;
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.rotation = rot;
+        this.rotSpeed = rotSpeed;
+        this.side = side; // -1 or 1
+        this.active = true;
+        this.opacity = 1.0;
+        this.wobble = Math.random() * Math.PI * 2;
+      }
+
+      update(dt) {
+        this.vy += 450 * dt;
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.rotation += this.rotSpeed * dt;
+        this.wobble += 6 * dt;
+        this.opacity -= 0.65 * dt;
+        if (this.opacity <= 0 || this.y > height + 80) {
+          this.active = false;
+        }
+      }
+
+      draw(c) {
+        c.save();
+        c.globalAlpha = Math.max(0, this.opacity);
+        c.translate(this.x, this.y);
+        c.rotate(this.rotation);
+
+        const r = this.def.radius;
+        const side = this.side;
+
+        // 1. Organic cellular outer contour path with slight hydrostatic bulge on cut face
+        c.beginPath();
+        if (side < 0) {
+          c.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, true);
+        } else {
+          c.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, false);
+        }
+        // Slightly curved biological cleavage face instead of a rigid ruler block
+        c.quadraticCurveTo(side * (r * 0.12), 0, 0, -r);
+        c.closePath();
+
+        // 2. Rich cellular cytoplasm interior gradient
+        const cytoGrad = c.createRadialGradient(side * (r * 0.3), 0, 2, 0, 0, r);
+        cytoGrad.addColorStop(0, '#ffffff'); // bright exposed nucleoid/lysis center
+        cytoGrad.addColorStop(0.25, this.def.baseColor);
+        cytoGrad.addColorStop(0.85, this.def.accentColor || this.def.baseColor);
+        cytoGrad.addColorStop(1, '#050b14');
+        c.fillStyle = cytoGrad;
+        c.fill();
+
+        // 3. Cellular lipid bilayer / peptidoglycan membrane rim
+        c.strokeStyle = this.def.accentColor || '#ef4444';
+        c.lineWidth = 2.5;
+        c.stroke();
+
+        // 4. Exposed internal organelles & nucleoid strands
+        c.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        for (let i = 0; i < 3; i++) {
+          const ox = side * (r * (0.2 + i * 0.22));
+          const oy = (i - 1) * (r * 0.35);
+          c.beginPath();
+          c.arc(ox, oy, 2.4, 0, Math.PI * 2);
+          c.fill();
+        }
+
+        // 5. Sizzling IPA Alcohol Disinfectant Reaction Rim along the slice edge
+        // Glowing cyan chemical reaction halo
+        c.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+        c.lineWidth = 4;
+        c.beginPath();
+        c.moveTo(0, -r);
+        c.quadraticCurveTo(side * (r * 0.12), 0, 0, r);
+        c.stroke();
+
+        // White-hot searing disinfectant cut line
+        c.strokeStyle = '#ffffff';
+        c.lineWidth = 2;
+        c.stroke();
+
+        // Lysis leakage droplet bead escaping the cut
+        c.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        c.beginPath();
+        c.arc(side * 4, Math.sin(this.wobble) * (r * 0.4), 2.8, 0, Math.PI * 2);
+        c.fill();
+
+        c.restore();
+      }
+    }
+
+    /* ==========================================================================
+       8. PARTICLES & FLOATING TEXTS (OBJECT POOLING)
+       ========================================================================== */
+    class Particle {
+      constructor() {
+        this.active = false;
+      }
+
+      init(x, y, vx, vy, color, radius, decay, isMist = false, isDroplet = false, isRing = false) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.radius = radius;
+        this.decay = decay;
+        this.life = 1.0;
+        this.isMist = isMist;
+        this.isDroplet = isDroplet;
+        this.isRing = isRing;
+        this.active = true;
+      }
+
+      update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        if (!this.isMist && !this.isRing) {
+          this.vy += 420 * dt; // Gravity on splatter
+        }
+        this.life -= this.decay * dt;
+        if (this.life <= 0) {
+          this.active = false;
+        }
+      }
+
+      draw(c) {
+        c.save();
+        c.globalAlpha = Math.max(0, this.life);
+        if (this.isRing) {
+          // Expanding shockwave ring along slice vector
+          c.strokeStyle = this.color;
+          c.lineWidth = Math.max(1, 2.5 * this.life);
+          c.beginPath();
+          c.arc(this.x, this.y, this.radius * (1 + (1 - this.life) * 2.2), 0, Math.PI * 2);
+          c.stroke();
+        } else if (this.isDroplet && (Math.abs(this.vx) > 15 || Math.abs(this.vy) > 15)) {
+          // Dynamic liquid teardrop stretched in direction of movement
+          const angle = Math.atan2(this.vy, this.vx);
+          const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+          const stretch = Math.min(2.4, 1 + speed * 0.004);
+          c.translate(this.x, this.y);
+          c.rotate(angle);
+          c.fillStyle = this.color;
+          c.beginPath();
+          c.ellipse(0, 0, this.radius * stretch, this.radius * 0.75, 0, 0, Math.PI * 2);
+          c.fill();
+        } else {
+          c.fillStyle = this.color;
+          c.beginPath();
+          c.arc(this.x, this.y, this.radius * (this.isMist ? 1 + (1 - this.life) : 1), 0, Math.PI * 2);
+          c.fill();
+        }
+        c.restore();
+      }
+    }
+
+    class FloatingText {
+      constructor() {
+        this.active = false;
+      }
+
+      init(text, x, y, color, size = 18, isCombo = false) {
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.size = size;
+        this.isCombo = isCombo;
+        this.life = 1.0;
+        this.vy = -75;
+        this.active = true;
+      }
+
+      update(dt) {
+        this.y += this.vy * dt;
+        this.life -= 1.1 * dt;
+        if (this.life <= 0) {
+          this.active = false;
+        }
+      }
+
+      draw(c) {
+        c.save();
+        c.globalAlpha = Math.max(0, this.life);
+        c.textAlign = 'center';
+        c.font = `900 ${this.size}px system-ui, sans-serif`;
+        c.shadowColor = 'rgba(0,0,0,0.8)';
+        c.shadowBlur = 6;
+        c.fillStyle = this.color;
+        c.fillText(this.text, this.x, this.y);
+        c.restore();
+      }
+    }
+
+    // Pool instances
+    for (let i = 0; i < 20; i++) microbes.push(new Microbe());
+    for (let i = 0; i < 25; i++) slicedHalves.push(new SlicedHalf());
+    for (let i = 0; i < 180; i++) particles.push(new Particle());
+    for (let i = 0; i < 30; i++) floatingTexts.push(new FloatingText());
+
+    function spawnParticle(x, y, vx, vy, color, radius, decay, isMist = false, isDroplet = false, isRing = false) {
+      const p = particles.find(item => !item.active);
+      if (p) p.init(x, y, vx, vy, color, radius, decay, isMist, isDroplet, isRing);
+    }
+
+    function spawnFloatingText(text, x, y, color, size = 18, isCombo = false) {
+      const ft = floatingTexts.find(item => !item.active);
+      if (ft) ft.init(text, x, y, color, size, isCombo);
+    }
+
+    /* ==========================================================================
+       9. SPAWNING ENGINE & GRADUAL DIFFICULTY CURVE (DE-CLUSTERED)
+       ========================================================================== */
+    function chooseRandomMicrobeDef() {
+      const roll = Math.random();
+
+      // Special items appear only as player progresses
+      if (roll < 0.05 && score > 300) {
+        return MICROBE_TYPES.PHAGE;
+      } else if (roll < 0.12 && score > 450) {
+        return MICROBE_TYPES.BIOHAZARD;
+      } else if (roll < 0.20 && score > 600) {
+        return MICROBE_TYPES.MRSA;
+      } else if (roll < 0.44) {
+        const beneficials = [
+          MICROBE_TYPES.LACTOBACILLUS,
+          MICROBE_TYPES.SACCHAROMYCES,
+          MICROBE_TYPES.RHIZOBIUM,
+          MICROBE_TYPES.BIFIDO
+        ];
+        return beneficials[Math.floor(Math.random() * beneficials.length)];
+      } else {
+        const pathogens = [
+          MICROBE_TYPES.S_AUREUS,
+          MICROBE_TYPES.E_COLI,
+          MICROBE_TYPES.SALMONELLA,
+          MICROBE_TYPES.CANDIDA,
+          MICROBE_TYPES.PSEUDOMONAS,
+          MICROBE_TYPES.VIRUS
+        ];
+        return pathogens[Math.floor(Math.random() * pathogens.length)];
+      }
+    }
+
+    function launchMicrobe(def, targetZoneIndex, totalZones, speedMultiplier = 1, timeRamp = 0, scoreRamp = 0) {
+      const m = microbes.find(item => !item.active);
+      if (!m) return;
+
+      const padding = 75;
+      const usableWidth = Math.max(100, width - padding * 2);
+      const zoneWidth = usableWidth / totalZones;
+
+      // Position within allocated zone to prevent clustering
+      let x = padding + zoneWidth * targetZoneIndex + (Math.random() * 0.6 + 0.2) * zoneWidth;
+
+      // Ensure minimum 120px physical spacing from previously launched item
+      if (Math.abs(x - lastSpawnX) < 120) {
+        x = ((x + 160) % usableWidth) + padding;
+      }
+      lastSpawnX = x;
+
+      const y = height + 40;
+
+      // Dynamic physics: Gravity & flight speed scale smoothly after 10s and with score
+      // Base GRAVITY = 350. Scales up to ~520 for punchy, fast, exciting arc action!
+      const effectiveGravity = GRAVITY * (1 + (timeRamp * 0.22) + (scoreRamp * 0.26));
+      const targetPeakY = height * (0.24 + Math.random() * 0.30);
+      const apexDelta = y - targetPeakY;
+      const vy = -Math.sqrt(2 * effectiveGravity * apexDelta);
+
+      // Smooth horizontal trajectory toward center
+      const centerOffset = (width / 2 - x) / (width / 2);
+      const vx = (centerOffset * (65 * Math.min(1.4, speedMultiplier))) + (Math.random() * 80 - 40);
+      const rotSpeed = (Math.random() - 0.5) * (2.2 * Math.min(1.45, speedMultiplier));
+
+      m.init(def, x, y, vx, vy, rotSpeed, effectiveGravity);
+    }
+
+    function scheduleWave() {
+      // Dynamic speed scaling:
+      // 1. Activates after 10s of gameplay: ramps up smoothly to keep player focused
+      const timeRamp = gameTime > 10 ? Math.min(1.0, (gameTime - 10) / 22) : 0;
+      // 2. Scales continuously as the score increases:
+      const scoreRamp = Math.min(1.2, score / 1200);
+      const speedMultiplier = 1.0 + (timeRamp * 0.42) + (scoreRamp * 0.58);
+
+      // Wave count scaling:
+      // First 10 seconds: strictly 1 microbe at a time for player onboarding
+      let count = 1;
+      if (gameTime > 10 || score > 300) {
+        if (score > 1200 || gameTime > 45) {
+          count = Math.random() < 0.6 ? 2 : 3;
+        } else if (score > 500 || gameTime > 22) {
+          count = Math.random() < 0.65 ? 2 : 1;
+        } else {
+          count = Math.random() < 0.45 ? 2 : 1;
+        }
+      }
+
+      // Discrete zones to ensure physical separation across the screen width
+      const totalZones = Math.max(count, 3);
+      const zoneIndices = [];
+      for (let z = 0; z < totalZones; z++) zoneIndices.push(z);
+
+      // Shuffle zones
+      for (let i = zoneIndices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [zoneIndices[i], zoneIndices[j]] = [zoneIndices[j], zoneIndices[i]];
+      }
+
+      // Queue each microbe with staggered delay so they NEVER appear clumped together
+      // Stagger delay gets faster as speedMultiplier increases
+      const baseStagger = Math.max(0.32, 0.62 / speedMultiplier);
+      for (let i = 0; i < count; i++) {
+        const def = chooseRandomMicrobeDef();
+        const staggerDelay = i * (baseStagger + Math.random() * 0.18);
+        spawnQueue.push({
+          def,
+          timer: staggerDelay,
+          zone: zoneIndices[i],
+          totalZones,
+          speedMultiplier,
+          timeRamp,
+          scoreRamp
+        });
+      }
+
+      // Wave interval: starts very relaxed (2.5s) and gets significantly faster after 10s and as score increases
+      const baseInterval = Math.max(1.05, 2.45 / speedMultiplier);
+      nextSpawnTime = baseInterval + Math.random() * (0.35 / speedMultiplier);
+    }
+
+    function updateSpawnQueue(dt) {
+      for (let i = spawnQueue.length - 1; i >= 0; i--) {
+        spawnQueue[i].timer -= dt;
+        if (spawnQueue[i].timer <= 0) {
+          const item = spawnQueue.splice(i, 1)[0];
+          launchMicrobe(item.def, item.zone, item.totalZones, item.speedMultiplier, item.timeRamp, item.scoreRamp);
+        }
+      }
+    }
+
+    /* ==========================================================================
+       10. SWIPE INTERACTION & HIT TESTING
+       ========================================================================== */
+    function recordSwipePoint(x, y) {
+      const now = performance.now();
+      currentSwipePoints.push({ x, y, time: now });
+
+      // Spawn alcohol aerosol disinfectant mist particles
+      for (let i = 0; i < 2; i++) {
+        const spread = (Math.random() - 0.5) * 12;
+        spawnParticle(
+          x + spread,
+          y + spread,
+          (Math.random() - 0.5) * 40,
+          (Math.random() - 0.5) * 40,
+          'rgba(207, 250, 254, 0.75)',
+          Math.random() * 3 + 1.5,
+          2.5,
+          true
+        );
+      }
+
+      // Clean old points
+      while (currentSwipePoints.length > 0 && now - currentSwipePoints[0].time > 180) {
+        currentSwipePoints.shift();
+      }
+
+      // Perform slice check if we have at least 2 points
+      if (currentSwipePoints.length >= 2 && gameState === 'PLAYING') {
+        const p1 = currentSwipePoints[currentSwipePoints.length - 2];
+        const p2 = currentSwipePoints[currentSwipePoints.length - 1];
+        checkSlices(p1.x, p1.y, p2.x, p2.y);
+      }
+    }
+
+    function checkSlices(x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 6) return; // Ignore micro jitter
+
+      sound.playSwipe();
+
+      let slicedInThisMotion = 0;
+      const now = performance.now();
+
+      microbes.forEach(m => {
+        if (!m.active) return;
+        const d = distToSegment(m.x, m.y, x1, y1, x2, y2);
+        if (d <= m.radius) {
+          // Hit detected!
+          handleMicrobeHit(m, x1, y1, x2, y2, now);
+          slicedInThisMotion++;
+        }
+      });
+    }
+
+    function handleMicrobeHit(m, x1, y1, x2, y2, now) {
+      // MRSA Superbug Multi-hit Mechanic
+      if (m.def.type === 'superbug' && m.hitsLeft > 1) {
+        m.hitsLeft--;
+        sound.playShieldHit();
+        screenShake = 4;
+        spawnFloatingText(`MRSA RESISTED! ${m.hitsLeft}/3`, m.x, m.y - 20, '#eab308', 16);
+        showFact('⚠️ Antibiotic Resistance Encountered!', m.def.fact, true);
+
+        // Shield hit spark shower
+        for (let i = 0; i < 18; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const s = Math.random() * 160 + 50;
+          spawnParticle(m.x, m.y, Math.cos(a) * s, Math.sin(a) * s, '#eab308', 3, 3);
+        }
+        return;
+      }
+
+      // Microbe is sliced!
+      m.active = false;
+      const def = m.def;
+
+      // 1. Biohazard Bomb Hit -> Instant Death
+      if (def.type === 'hazard') {
+        sound.playExplosion();
+        screenShake = 16;
+        for (let i = 0; i < 40; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const s = Math.random() * 280 + 40;
+          spawnParticle(m.x, m.y, Math.cos(a) * s, Math.sin(a) * s, '#eab308', 5, 1.6);
+        }
+        triggerGameOver('☣️ Biohazard autoclave breach! Toxic aerosolization terminated the lab!');
+        return;
+      }
+
+      // 2. Beneficial Microbe Hit -> Lost Life
+      if (def.type === 'beneficial') {
+        pathogenStreak = 0; // Reset streak on mistake
+        lives--;
+        updateLivesHUD();
+        sound.playErrorBuzzer();
+        screenShake = 9;
+
+        spawnFloatingText('-1 LIFE! FLORA NUKED!', m.x, m.y - 20, '#ef4444', 18);
+        showFact('🚨 Good Flora Destroyed!', `You nuked your good flora! ${def.fullName}: ${def.fact}`, true);
+
+        // Red X error particles
+        for (let i = 0; i < 20; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const s = Math.random() * 180 + 30;
+          spawnParticle(m.x, m.y, Math.cos(a) * s, Math.sin(a) * s, '#ef4444', 3.5, 2.2);
+        }
+
+        if (lives <= 0) {
+          triggerGameOver('You nuked all your good flora! Microbiome diversity collapsed.');
+        }
+        return;
+      }
+
+      // 3. Bacteriophage Power-up -> Screen-wide Pathogen Lysis Blast
+      if (def.type === 'powerup') {
+        sound.playPhageBlast();
+        screenShake = 12;
+        spawnFloatingText('⚡ PHAGE THERAPY ACTIVATED!', m.x, m.y - 20, '#38bdf8', 20);
+        showFact('🧬 Phage Therapy Unleashed!', def.fact, false);
+
+        // Clear all active pathogens on screen with score reward
+        let cleared = 0;
+        microbes.forEach(other => {
+          if (other.active && (other.def.type === 'pathogen' || other.def.type === 'superbug')) {
+            other.active = false;
+            cleared++;
+            score += other.def.points;
+            createMicrobeSplits(other, other.x, other.y - 1, other.x, other.y + 1);
+            spawnFloatingText(`+${other.def.points}`, other.x, other.y, '#38bdf8', 16);
+          }
+        });
+        score += def.points;
+        scoreDisplay.textContent = score;
+        return;
+      }
+
+      // 4. Pathogen Sliced -> Score, Streak & Combo Tracking
+      pathogensSterilized++;
+      pathogenStreak++;
+      if (pathogenStreak > bestStreak) bestStreak = pathogenStreak;
+      screenShake = 3.5;
+
+      // 5-Hit Streak Life Regeneration Mechanic (Gain life by making streaks of 5 hits)
+      if (pathogenStreak % 5 === 0) {
+        if (lives < 5) {
+          lives++;
+          updateLivesHUD();
+          sound.playLifeRestored();
+          spawnFloatingText(`+1 LIFE REGAINED! (${pathogenStreak} STREAK!)`, m.x, m.y - 38, '#22c55e', 20, true);
+          showFact('🧫 Microbiome Restored!', `${pathogenStreak}-hit streak! Regained +1 agar life dish! (Lives: ${lives}/5)`, false);
+          // Green restorative aura burst
+          for (let i = 0; i < 22; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const s = Math.random() * 200 + 40;
+            spawnParticle(m.x, m.y, Math.cos(a) * s, Math.sin(a) * s, '#22c55e', 4.5, 1.8);
+          }
+        } else {
+          score += 500;
+          scoreDisplay.textContent = score;
+          sound.playLifeRestored();
+          spawnFloatingText(`MAX LIVES! +500 STREAK BONUS!`, m.x, m.y - 38, '#facc15', 18, true);
+        }
+      }
+
+      // Combo timing check: slice within 320ms continues/adds combo
+      if (now - lastSliceTimestamp < 320) {
+        currentCombo++;
+      } else {
+        currentCombo = 1;
+      }
+      lastSliceTimestamp = now;
+      if (currentCombo > maxCombo) maxCombo = currentCombo;
+
+      // Combo points multiplier
+      const comboMultiplier = currentCombo >= 2 ? currentCombo : 1;
+      const earned = def.points * comboMultiplier;
+      score += earned;
+      scoreDisplay.textContent = score;
+
+      sound.playSlicePathogen(currentCombo);
+      createMicrobeSplits(m, x1, y1, x2, y2);
+
+      if (currentCombo >= 2) {
+        const comboMsg = currentCombo === 2 ? '2x DUAL STERILIZATION!' : `${currentCombo}x STERILE SWEEP!`;
+        spawnFloatingText(`${comboMsg} +${earned}`, m.x, m.y - 28, '#38bdf8', 20, true);
+      } else {
+        spawnFloatingText(`+${earned}`, m.x, m.y - 15, '#f43f5e', 16);
+      }
+
+      showFact(`🔬 ${def.fullName} [${def.gram.toUpperCase()}]`, def.fact, false);
+    }
+
+    function createMicrobeSplits(m, x1, y1, x2, y2) {
+      // Calculate cut angle & perpendicular normal
+      const cutAngle = Math.atan2(y2 - y1, x2 - x1);
+      const normX = -Math.sin(cutAngle);
+      const normY = Math.cos(cutAngle);
+
+      // Spawn two cut halves with dynamic impulse and outward spin
+      const impulse = 150 + Math.random() * 30;
+      const h1 = slicedHalves.find(item => !item.active);
+      if (h1) h1.init(m.def, m.x, m.y, m.vx + normX * impulse, m.vy + normY * impulse, cutAngle, -3.4, -1);
+
+      const h2 = slicedHalves.find(item => !item.active);
+      if (h2) h2.init(m.def, m.x, m.y, m.vx - normX * impulse, m.vy - normY * impulse, cutAngle, 3.4, 1);
+
+      // 1. Expanding disinfectant sterilization shockwave ring
+      spawnParticle(m.x, m.y, 0, 0, '#38bdf8', m.radius * 0.9, 6.0, false, false, true);
+      spawnParticle(m.x, m.y, 0, 0, '#ffffff', m.radius * 0.6, 7.5, false, false, true);
+
+      // 2. Dynamic fluid cytoplasm droplets flung outwards perpendicular to blade
+      const stainColor = m.def.baseColor;
+      const accentColor = m.def.accentColor || '#ffffff';
+      for (let i = 0; i < 24; i++) {
+        const sideDir = (i % 2 === 0 ? 1 : -1);
+        const sprayAngle = cutAngle + (sideDir * Math.PI / 2) + (Math.random() - 0.5) * 0.8;
+        const speed = Math.random() * 240 + 70;
+        const color = Math.random() < 0.25 ? accentColor : stainColor;
+        spawnParticle(
+          m.x + (Math.random() - 0.5) * 12,
+          m.y + (Math.random() - 0.5) * 12,
+          Math.cos(sprayAngle) * speed,
+          Math.sin(sprayAngle) * speed,
+          color,
+          Math.random() * 3.5 + 2.0,
+          1.9,
+          false,
+          true // isDroplet
+        );
+      }
+
+      // 3. Alcohol disinfectant aerosol mist fizz puffs
+      for (let i = 0; i < 10; i++) {
+        spawnParticle(
+          m.x + (Math.random() - 0.5) * 20,
+          m.y + (Math.random() - 0.5) * 20,
+          (Math.random() - 0.5) * 90,
+          (Math.random() - 0.5) * 90,
+          'rgba(224, 242, 254, 0.85)',
+          Math.random() * 5 + 3,
+          2.4,
+          true // isMist
+        );
+      }
+    }
+
+    /* ==========================================================================
+       11. INPUT LISTENERS (TOUCH & MOUSE SUPPORT)
+       ========================================================================== */
+    function onPointerDown(e) {
+      sound.init();
+      isInteracting = true;
+      currentSwipePoints = [];
+      const pt = getCanvasPoint(e);
+      recordSwipePoint(pt.x, pt.y);
+    }
+
+    function onPointerMove(e) {
+      if (!isInteracting) return;
+      const pt = getCanvasPoint(e);
+      recordSwipePoint(pt.x, pt.y);
+    }
+
+    function onPointerUp() {
+      isInteracting = false;
+      currentSwipePoints = [];
+    }
+
+    function getCanvasPoint(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    // Touch events
+    window.addEventListener('touchstart', onPointerDown, { passive: false });
+    window.addEventListener('touchmove', e => {
+      e.preventDefault();
+      onPointerMove(e);
+    }, { passive: false });
+    window.addEventListener('touchend', onPointerUp);
+    window.addEventListener('touchcancel', onPointerUp);
+
+    // Mouse fallback
+    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+
+    /* ==========================================================================
+       12. GAME LOOP & DRAWING
+       ========================================================================== */
+    let lastTime = performance.now();
+
+    function gameLoop(now) {
+      if (gameState === 'PAUSED') {
+        lastTime = now;
+        requestAnimationFrame(gameLoop);
+        return;
+      }
+
+      const dt = Math.min((now - lastTime) / 1000, 0.08); // Delta time capped at 80ms
+      lastTime = now;
+
+      // Handle screen shake
+      let shakeX = 0;
+      let shakeY = 0;
+      if (screenShake > 0) {
+        shakeX = (Math.random() - 0.5) * screenShake;
+        shakeY = (Math.random() - 0.5) * screenShake;
+        screenShake = Math.max(0, screenShake - dt * 25);
+      }
+
+      ctx.save();
+      ctx.clearRect(0, 0, width, height);
+      ctx.translate(shakeX, shakeY);
+
+      // Draw Laboratory Agar Background Grid
+      drawLaboratoryBench();
+
+      if (gameState === 'PLAYING') {
+        const prevGameTime = gameTime;
+        gameTime += dt;
+
+        // At 10s of gameplay, notify player that incubation pace has accelerated
+        if (prevGameTime < 10 && gameTime >= 10) {
+          showFact('⚡ STERILIZATION SURGE!', 'Microbial growth accelerating! Pacing increased — stay sharp!');
+          spawnFloatingText('⚡ SPEED SURGE! INCUBATION ACCELERATED!', width / 2, height * 0.45, '#38bdf8', 20, true);
+          screenShake = 4;
+        }
+
+        updateSpawnQueue(dt);
+        nextSpawnTime -= dt;
+        if (nextSpawnTime <= 0) {
+          scheduleWave();
+        }
+      }
+
+      // Update & Render Microbes
+      microbes.forEach(m => {
+        if (m.active) {
+          m.update(dt);
+          m.draw(ctx);
+        }
+      });
+
+      // Update & Render Sliced Halves
+      slicedHalves.forEach(h => {
+        if (h.active) {
+          h.update(dt);
+          h.draw(ctx);
+        }
+      });
+
+      // Update & Render Particles
+      particles.forEach(p => {
+        if (p.active) {
+          p.update(dt);
+          p.draw(ctx);
+        }
+      });
+
+      // Update & Render Floating Texts
+      floatingTexts.forEach(ft => {
+        if (ft.active) {
+          ft.update(dt);
+          ft.draw(ctx);
+        }
+      });
+
+      // Draw Disinfectant Blade Trail (Ethanol Spray Ribbon)
+      drawDisinfectantTrail(now);
+
+      ctx.restore();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Draw Dark Agar / Microscope Plate Grid
+    function drawLaboratoryBench() {
+      // Subtle microscope grid lines
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.04)';
+      ctx.lineWidth = 1;
+      const gridSize = 48;
+      for (let x = 0; x < width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      // Subtle center petri dish rim glow
+      const cx = width / 2;
+      const cy = height / 2;
+      const r = Math.min(width, height) * 0.44;
+      const grad = ctx.createRadialGradient(cx, cy, r * 0.7, cx, cy, r * 1.15);
+      grad.addColorStop(0, 'rgba(56, 189, 248, 0)');
+      grad.addColorStop(0.85, 'rgba(56, 189, 248, 0.025)');
+      grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 1.15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw Disinfectant Spray Trail with alcohol mist & glowing core
+    function drawDisinfectantTrail(now) {
+      // Filter trail points younger than 200ms
+      while (currentSwipePoints.length > 0 && now - currentSwipePoints[0].time > 200) {
+        currentSwipePoints.shift();
+      }
+      if (currentSwipePoints.length < 2) return;
+
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // 1. Outer alcohol vapor mist glow
+      for (let i = 1; i < currentSwipePoints.length; i++) {
+        const p1 = currentSwipePoints[i - 1];
+        const p2 = currentSwipePoints[i];
+        const ageNorm = (now - p2.time) / 200; // 0 (new) to 1 (old)
+        const alpha = Math.max(0, 1 - ageNorm);
+        const thickness = (1 - ageNorm) * 18;
+
+        ctx.strokeStyle = `rgba(56, 189, 248, ${alpha * 0.25})`;
+        ctx.lineWidth = thickness + 8;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+
+      // 2. Sharp alcohol spray cutting core
+      for (let i = 1; i < currentSwipePoints.length; i++) {
+        const p1 = currentSwipePoints[i - 1];
+        const p2 = currentSwipePoints[i];
+        const ageNorm = (now - p2.time) / 200;
+        const alpha = Math.max(0, 1 - ageNorm);
+        const thickness = (1 - ageNorm) * 8;
+
+        ctx.strokeStyle = `rgba(224, 242, 254, ${alpha * 0.9})`;
+        ctx.lineWidth = thickness;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    /* ==========================================================================
+       13. GAME CONTROL & STATE TRANSITIONS
+       ========================================================================== */
+    function startGame() {
+      sound.init();
+      score = 0;
+      lives = 5;
+      pathogensSterilized = 0;
+      pathogenStreak = 0;
+      bestStreak = 0;
+      currentCombo = 0;
+      maxCombo = 0;
+      gameTime = 0;
+      nextSpawnTime = 1.0;
+      spawnQueue.length = 0;
+      lastSpawnX = -999;
+
+      // Reset entities
+      microbes.forEach(m => m.active = false);
+      slicedHalves.forEach(h => h.active = false);
+      particles.forEach(p => p.active = false);
+      floatingTexts.forEach(ft => ft.active = false);
+
+      scoreDisplay.textContent = '0';
+      updateLivesHUD();
+      showFact('🔬 Disinfectant Active', 'Swipe with 70% IPA to kill red pathogens! Do NOT slice green beneficial flora!');
+
+      startModal.classList.add('hidden');
+      gameoverModal.classList.add('hidden');
+      if (pauseModal) pauseModal.classList.add('hidden');
+      if (factsModal) factsModal.classList.add('hidden');
+      gameState = 'PLAYING';
+      if (!sound.isMuted) {
+        sound.startBGM();
+      }
+    }
+
+    function pauseGame() {
+      if (gameState !== 'PLAYING') return;
+      gameState = 'PAUSED';
+      isInteracting = false;
+      currentSwipePoints = [];
+      sound.pauseMusic();
+      if (pauseModal) pauseModal.classList.remove('hidden');
+      syncMusicUI(sound.isMuted);
+    }
+
+    function resumeGame() {
+      if (gameState !== 'PAUSED') return;
+      if (pauseModal) pauseModal.classList.add('hidden');
+      gameState = 'PLAYING';
+      lastTime = performance.now();
+      sound.resumeMusic();
+    }
+
+    function triggerGameOver(reason) {
+      gameState = 'GAMEOVER';
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('gramslash_highscore', highScore.toString());
+        highScoreDisplay.textContent = 'Best: ' + highScore;
+      }
+
+      finalScoreEl.textContent = score;
+      finalHighScoreEl.textContent = highScore;
+      finalMaxComboEl.textContent = maxCombo + 'x';
+      if (finalBestStreakEl) finalBestStreakEl.textContent = bestStreak;
+      gameoverReasonEl.textContent = reason;
+
+      // Player Score Evaluation & Feedback
+      let assessment = '';
+      let assessmentColor = '#38bdf8';
+      let assessmentBg = 'rgba(56, 189, 248, 0.15)';
+      let assessmentBorder = 'rgba(56, 189, 248, 0.4)';
+      let assessmentIcon = '🎯';
+
+      if (score < 5000) {
+        assessment = 'There is room for improvement';
+        assessmentColor = '#fca5a5';
+        assessmentBg = 'rgba(239, 68, 68, 0.15)';
+        assessmentBorder = 'rgba(239, 68, 68, 0.35)';
+        assessmentIcon = '🌱';
+      } else if (score < 10000) {
+        assessment = 'Decent score';
+        assessmentColor = '#fde047';
+        assessmentBg = 'rgba(234, 179, 8, 0.15)';
+        assessmentBorder = 'rgba(234, 179, 8, 0.35)';
+        assessmentIcon = '👍';
+      } else if (score < 15000) {
+        assessment = 'Good Score';
+        assessmentColor = '#86efac';
+        assessmentBg = 'rgba(34, 197, 94, 0.15)';
+        assessmentBorder = 'rgba(34, 197, 94, 0.35)';
+        assessmentIcon = '⭐';
+      } else if (score < 20000) {
+        assessment = 'Really good score';
+        assessmentColor = '#38bdf8';
+        assessmentBg = 'rgba(56, 189, 248, 0.15)';
+        assessmentBorder = 'rgba(56, 189, 248, 0.4)';
+        assessmentIcon = '🔥';
+      } else if (score <= 25000) {
+        assessment = 'Brilliant score';
+        assessmentColor = '#c084fc';
+        assessmentBg = 'rgba(192, 132, 252, 0.18)';
+        assessmentBorder = 'rgba(192, 132, 252, 0.45)';
+        assessmentIcon = '💎';
+      } else {
+        assessment = "You're really fast with your fingers";
+        assessmentColor = '#f43f5e';
+        assessmentBg = 'rgba(244, 63, 94, 0.18)';
+        assessmentBorder = 'rgba(244, 63, 94, 0.45)';
+        assessmentIcon = '⚡';
+      }
+
+      if (finalPerformanceEl) {
+        finalPerformanceEl.innerHTML = `<span>${assessmentIcon}</span><span>${assessment}</span>`;
+        finalPerformanceEl.style.color = assessmentColor;
+        finalPerformanceEl.style.background = assessmentBg;
+        finalPerformanceEl.style.borderColor = assessmentBorder;
+      }
+
+      syncMusicUI(sound.isMuted);
+      gameoverModal.classList.remove('hidden');
+    }
+
+    // Button event listeners
+    startBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', startGame);
+
+    // Microbial Facts Guide Modal Navigation (Accessed from Game Over screen at the end)
+    if (gameoverFactsBtn) {
+      gameoverFactsBtn.addEventListener('click', () => {
+        sound.unlock();
+        gameoverModal.classList.add('hidden');
+        if (factsModal) factsModal.classList.remove('hidden');
+        syncMusicUI(sound.isMuted);
+      });
+    }
+
+    if (returnStartBtn) {
+      returnStartBtn.addEventListener('click', () => {
+        sound.unlock();
+        if (factsModal) factsModal.classList.add('hidden');
+        startModal.classList.remove('hidden');
+        syncMusicUI(sound.isMuted);
+      });
+    }
+
+    // Unified Music Toggle (Start Screen, Gameplay HUD, Pause Screen, Game Over Screen & Facts Page)
+    function syncMusicUI(isMuted) {
+      if (musicBtn) {
+        musicBtn.textContent = isMuted ? '🔇' : '🎵';
+        musicBtn.title = isMuted ? 'Music: Off (Tap to Play)' : 'Music: Playing (Tap to Turn Off)';
+        musicBtn.classList.toggle('muted', isMuted);
+      }
+      if (startMusicBtn) {
+        startMusicBtn.innerHTML = isMuted
+          ? '<span>🔇</span><span>Music: Paused</span>'
+          : '<span>🎵</span><span>Music: Playing</span>';
+        startMusicBtn.classList.toggle('muted', isMuted);
+      }
+      if (pauseMusicBtn) {
+        pauseMusicBtn.innerHTML = isMuted
+          ? '<span>🔇</span><span>Music: Off</span>'
+          : '<span>🎵</span><span>Music: Playing</span>';
+        pauseMusicBtn.classList.toggle('muted', isMuted);
+      }
+      if (gameoverMusicBtn) {
+        gameoverMusicBtn.innerHTML = isMuted
+          ? '<span>🔇</span><span>Music: Off</span>'
+          : '<span>🎵</span><span>Music: Playing</span>';
+        gameoverMusicBtn.classList.toggle('muted', isMuted);
+      }
+      if (factsMusicBtn) {
+        factsMusicBtn.textContent = isMuted ? '🔇' : '🎵';
+        factsMusicBtn.title = isMuted ? 'Music: Off (Tap to Play)' : 'Music: Playing (Tap to Turn Off)';
+        factsMusicBtn.classList.toggle('muted', isMuted);
+      }
+    }
+
+    function toggleMusic() {
+      sound.unlock();
+      const isMuted = sound.toggleMute();
+      syncMusicUI(isMuted);
+      showFact(
+        isMuted ? '🔇 Music Paused' : '🎵 Music Playing',
+        isMuted ? 'Background soundtrack silenced.' : 'Background piano soundtrack active!'
+      );
+    }
+
+    if (musicBtn) {
+      musicBtn.addEventListener('click', toggleMusic);
+    }
+
+    if (startMusicBtn) {
+      startMusicBtn.addEventListener('click', toggleMusic);
+    }
+
+    if (gameoverMusicBtn) {
+      gameoverMusicBtn.addEventListener('click', toggleMusic);
+    }
+
+    if (factsMusicBtn) {
+      factsMusicBtn.addEventListener('click', toggleMusic);
+    }
+
+    if (pauseMusicBtn) {
+      pauseMusicBtn.addEventListener('click', () => {
+        sound.unlock();
+        const isMuted = sound.toggleMute();
+        syncMusicUI(isMuted);
+        if (isMuted) {
+          sound.pauseMusic();
+        }
+      });
+    }
+
+    // Pause & Resume Controls
+    if (pauseBtn) {
+      pauseBtn.addEventListener('click', () => {
+        if (gameState === 'PLAYING') {
+          pauseGame();
+        }
+      });
+    }
+
+    if (resumeBtn) {
+      resumeBtn.addEventListener('click', resumeGame);
+    }
+
+    // Auto-pause when player leaves tab, minimizes browser, or backgrounds app
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && gameState === 'PLAYING') {
+        pauseGame();
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      if (gameState === 'PLAYING') {
+        pauseGame();
+      }
+    });
+
+    window.addEventListener('pagehide', () => {
+      if (gameState === 'PLAYING') {
+        pauseGame();
+      }
+    });
+
+    // Custom audio file input support
+    if (customMusicFile) {
+      customMusicFile.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+          sound.setCustomAudio(file);
+          syncMusicUI(false);
+          showFact('🎶 Custom Music Playing', `Loaded: ${file.name}!`);
+        }
+      });
+    }
+
+    // Android long-press context menu prevention
+    window.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Mobile audio context unlock on first user gesture
+    window.addEventListener('touchstart', () => sound.unlock(), { once: true, passive: true });
+    window.addEventListener('mousedown', () => sound.unlock(), { once: true });
+
+    // Register Service Worker for offline play on Android phones and tablets
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => {
+          console.warn('SW registration:', err);
+        });
+      });
+    }
+
+    // Cache page assets into CacheStorage for instant offline availability
+    if ('caches' in window) {
+      caches.open('gramslash-v3').then(cache => {
+        cache.add(window.location.href).catch(() => {});
+        cache.add('/').catch(() => {});
+      }).catch(() => {});
+    }
+
+    // Start rendering loop
+    requestAnimationFrame(gameLoop);
+  })();
+  </script>
+</body>
+</html>
+

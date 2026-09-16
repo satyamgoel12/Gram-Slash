@@ -1,0 +1,6 @@
+{
+  "name": "Gram Slash",
+  "description": "Fruit-Ninja-style microbiology game slicing pathogens with disinfectant spray while preserving beneficial flora.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
